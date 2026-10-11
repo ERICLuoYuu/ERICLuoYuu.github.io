@@ -74,8 +74,12 @@ export function createHash(spacing, maxNumObjects) {
 
     /** Particles in the cells around particle `nr` (a superset of those within maxDist). */
     query(pos, nr, maxDist) {
-      const [x0, y0, z0] = [0, 1, 2].map((k) => intCoord(pos[3 * nr + k] - maxDist));
-      const [x1, y1, z1] = [0, 1, 2].map((k) => intCoord(pos[3 * nr + k] + maxDist));
+      const x0 = intCoord(pos[3 * nr] - maxDist);
+      const y0 = intCoord(pos[3 * nr + 1] - maxDist);
+      const z0 = intCoord(pos[3 * nr + 2] - maxDist);
+      const x1 = intCoord(pos[3 * nr] + maxDist);
+      const y1 = intCoord(pos[3 * nr + 1] + maxDist);
+      const z1 = intCoord(pos[3 * nr + 2] + maxDist);
       let size = 0;
       for (let xi = x0; xi <= x1; xi += 1) {
         for (let yi = y0; yi <= y1; yi += 1) {

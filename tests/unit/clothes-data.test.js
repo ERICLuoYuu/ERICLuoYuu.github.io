@@ -25,3 +25,33 @@ test('garments.json lists the eight garments with textures, grids and materials'
     assert.ok(buildMesh(g).count > 100, `${g.id} has a usable mesh`);
   }));
 });
+
+test('pile.json is a settled pile that hides the booklet and leaves the photo in view', async () => {
+  const { createWorld, setPositions } = await import('../../js/cloth/solver.js');
+  const { bookCoverage } = await import('../../js/cloth/coverage.js');
+  const { CONTENTS } = await import('../../js/scene/geometry.js');
+  const data = await readJson('assets/clothes/garments.json');
+  const pile = await readJson('assets/clothes/pile.json');
+  assert.equal(pile.version, 1);
+  assert.deepEqual(pile.garments.map((g) => g.id), data.garments.map((g) => g.id));
+
+  const meshes = data.garments.map(buildMesh);
+  const world = createWorld({
+    garments: meshes.map((mesh, i) => ({ mesh, material: data.garments[i].material })),
+    bounds: { min: [-900, -900, 0], max: [1300, 1300, 900] },
+    thickness: pile.thickness,
+  });
+  pile.garments.forEach(({ positions }, g) => {
+    assert.equal(positions.length, 3 * meshes[g].count, `${pile.garments[g].id} has one position per particle`);
+    for (let i = 0; i < positions.length; i += 3) {
+      const [x, y, z] = positions.slice(i, i + 3);
+      const where = `${pile.garments[g].id} particle ${i / 3} at (${x}, ${y}, ${z})`;
+      // the walls' inner faces are 2 units in: no cloth may poke through them
+      assert.ok(x > 2 && x < 418 && y > 2 && y < 298, `${where} is inside the walls`);
+      assert.ok(z >= 0 && z < 220, `${where} is below the rim`);
+    }
+    setPositions(world, g, Float32Array.from(positions));
+  });
+  assert.ok(bookCoverage(world, CONTENTS.book) >= 0.85, 'the booklet is hidden');
+  assert.ok(bookCoverage(world, { ...CONTENTS.photo, thickness: 1 }) <= 0.25, 'the photo stays mostly visible');
+});

@@ -125,7 +125,7 @@ test('world bounds clamp a flung garment and a huge time step is clamped', () =>
   for (let i = 1; i < w.pos.length; i += 3) assert.ok(w.pos[i] <= bounds.max[1]);
 });
 
-test('a falling garment lands on a sleeping one, wakes it, and both come to rest stacked', () => {
+test('a falling garment lands on a sleeping one and comes to rest on top of it', () => {
   const w = world({ meshes: [sheet(), sheet()] });
   setPositions(w, 1, shifted(w, 1, [5, 5, 60]));
   sleepAll(w);
@@ -144,4 +144,64 @@ test('a sleeping garment is not moved by a slow neighbour resting on it', () => 
   setPositions(w, 1, shifted(w, 1, [0, 0, 0]));
   run(w, 1);
   assert.deepEqual([...w.pos.slice(0, w.counts[0] * 3)], bottom);
+});
+
+test('pulling a garment out from under another wakes the one on top; others sleep on', () => {
+  const w = world({ meshes: [sheet(), sheet(), sheet()] });
+  setPositions(w, 1, shifted(w, 1, [5, 5, THICKNESS]));
+  setPositions(w, 2, shifted(w, 2, [200, 0, 0])); // beside them, on the floor
+  run(w, 0.5);
+  sleepAll(w);
+  const start = [w.pos[0], w.pos[1], w.pos[2]]; // sheet 0's corner furthest from sheet 2
+  grab(w, 0, [0], start);
+  assert.deepEqual([...w.awake], [1, 0, 0], 'holding still disturbs nothing');
+  for (let t = 1; t <= 40; t += 1) {
+    moveGrip(w, [start[0] - 5 * t, start[1], start[2]]);
+    step(w, 1 / 60);
+  }
+  assert.equal(w.awake[1], 1, 'the top sheet lost its support and woke');
+  assert.equal(w.awake[2], 0);
+});
+
+test('a garment dragged across the top of a sleeping one leaves it asleep', () => {
+  const w = world({ meshes: [sheet(10, 10), sheet()] });
+  setPositions(w, 1, shifted(w, 1, [5, 5, THICKNESS]));
+  run(w, 0.5);
+  sleepAll(w);
+  const held = w.offsets[1] + 6; // the top sheet's right-hand front corner
+  const start = [0, 1, 2].map((c) => w.pos[3 * held + c]);
+  grab(w, 1, [held], start);
+  for (let t = 1; t <= 30; t += 1) {
+    moveGrip(w, [start[0] + 4 * t, start[1], start[2] + Math.min(20, t)]); // lift a little, pull across
+    step(w, 1 / 60);
+  }
+  assert.equal(w.awake[0], 0);
+});
+
+test('one stray fast particle does not wake a sleeping garment', () => {
+  const w = world({ meshes: [sheet(), sheet()] });
+  setPositions(w, 1, shifted(w, 1, [5, 5, THICKNESS]));
+  run(w, 0.5);
+  sleepAll(w);
+  setPositions(w, 1, shifted(w, 1, [0, 0, 0])); // wakes only the top sheet
+  const buzzing = w.offsets[1] + 24; // a particle in the middle of the top sheet
+  w.vel[3 * buzzing + 2] = -1000;
+  step(w, 1 / 60);
+  assert.equal(w.awake[0], 0);
+});
+
+test('cloth dragged hard into a sleeping garment wakes it', () => {
+  const w = world({ meshes: [sheet(), sheet()] });
+  setPositions(w, 1, shifted(w, 1, [80, 0, 0]));
+  run(w, 0.5);
+  sleepAll(w);
+  const held = w.offsets[1];
+  const start = [0, 1, 2].map((c) => w.pos[3 * held + c]);
+  grab(w, 1, [held], start);
+  assert.equal(w.awake[0], 0);
+  for (let t = 1; t <= 30; t += 1) {
+    moveGrip(w, [start[0] - 8 * t, start[1], start[2]]); // 480 units a second, towards sheet 0
+    step(w, 1 / 60);
+  }
+  assert.equal(w.awake[0], 1);
 });
