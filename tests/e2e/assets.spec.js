@@ -4,7 +4,7 @@ import { openSite, waitForState } from './helpers.js';
 test('essential artwork, fonts and sounds load cleanly', async ({ page }) => {
   const problems = await openSite(page);
   await expect(page.locator('#loader')).toBeHidden();
-  const fontsReady = await page.evaluate(() => document.fonts.check('500 24px Caveat') && document.fonts.check('400 18px Lora'));
+  const fontsReady = await page.evaluate(() => document.fonts.check('500 24px Caveat') && document.fonts.check('400 18px "Noto Sans"') && document.fonts.check('700 18px "Noto Sans"'));
   expect(fontsReady).toBe(true);
   const images = await page.evaluate(() => {
     const style = getComputedStyle(document.querySelector('.parcel'));

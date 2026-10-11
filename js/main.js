@@ -25,8 +25,8 @@ const FALLBACK = {
   flapShort: 'assets/art/flap-short.svg',
   boxInside: 'assets/art/box-inside.svg',
   boxFloor: 'assets/art/box-floor.svg',
-  bookCover: 'assets/placeholders/book-cover.svg',
-  endpaper: 'assets/placeholders/endpaper.svg',
+  bookCover: 'assets/art/manual-cover.svg',
+  endpaper: 'assets/art/manual-endpaper.svg',
   questionMark: 'assets/placeholders/question-mark.svg',
   desiccant: 'assets/art/desiccant.webp',
   photo: 'assets/placeholders/photo.svg',
@@ -107,7 +107,7 @@ function imagePlan(config) {
 function fontsTask() {
   if (!document.fonts?.load) return Promise.resolve();
   return Promise.all([
-    '500 32px Caveat', '700 32px Caveat', '400 18px Lora', 'italic 400 18px Lora', '600 18px Lora',
+    '500 32px Caveat', '700 32px Caveat', '400 18px "Noto Sans"', '700 18px "Noto Sans"',
   ].map((f) => document.fonts.load(f)));
 }
 

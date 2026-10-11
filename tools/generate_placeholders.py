@@ -1,8 +1,9 @@
 """Generate the site's built-in art, placeholders, textures, cursors and sounds.
 
 The cardboard box faces are the site's own box art and go to assets/art/.
-The personal pieces (book cover, endpaper, photo, question mark) are stand-ins:
-they go to assets/placeholders/ and are stamped "placeholder".
+The fallback photo and the question mark are stand-ins: they go to
+assets/placeholders/ and are stamped "placeholder". (The booklet's drawings
+come from tools/generate_manual.py.)
 Neutral UI pieces (cursors, textures, sounds) go to assets/ui, assets/textures
 and assets/sounds and can be kept or replaced.
 
@@ -156,16 +157,6 @@ def stroke(d, color=INK, width=1.4, opacity=0.85, extra="") -> str:
     )
 
 
-def blotches(w, h, n, color, opacity_range=(0.04, 0.1)) -> str:
-    out = []
-    for _ in range(n):
-        out.append(
-            f'<path d="{rough_ellipse(rng.uniform(0, w), rng.uniform(0, h), rng.uniform(8, 40), rng.uniform(4, 18), 2)}" '
-            f'fill="{color}" opacity="{rng.uniform(*opacity_range):.2f}"/>'
-        )
-    return "".join(out)
-
-
 # ---------------------------------------------------------- cardboard faces --
 
 def soft_patches(w: float, h: float, n: int, color: str, opacity_range: tuple[float, float], name: str) -> str:
@@ -253,42 +244,10 @@ def make_box_faces():
     (ART / "box-floor.svg").write_text(cardboard(420, 300, "#d4bd95", "#a88b62", seam))
 
 
-# ------------------------------------------------------------ book & photo --
+# ------------------------------------------------------------------- photo --
 
-def make_book_art():
-    reseed("book")
-    w, h = 360, 500
-    sprig = smooth_open([(180, 430), (182, 392), (178, 352)])
-    leaves = "".join(
-        f'<path d="{rough_ellipse(180 + s * 13, 420 - i * 22, 11, 5, 0.6)}" transform="rotate({s * -28} {180 + s * 13} {420 - i * 22})" '
-        f'fill="#e9d6a8" opacity=".85"/>'
-        for i in range(4) for s in (-1, 1)
-    )
-    cover = (
-        f'<rect width="{w}" height="{h}" fill="#41706b"/>'
-        + blotches(w, h, 30, "#ffffff", (0.02, 0.06)) + blotches(w, h, 20, "#0b2a28", (0.04, 0.08))
-        + f'<rect x="0" y="0" width="22" height="{h}" fill="#000" opacity=".16"/>'
-        + stroke(rough_rect(36, 30, w - 66, h - 60, 1.4), "#e9d6a8", 1.8, 0.8)
-        + stroke(rough_rect(44, 38, w - 82, h - 76, 1.4), "#e9d6a8", 1, 0.5)
-        + stroke(sprig, "#e9d6a8", 2, 0.9) + leaves
-        + stamp_text(w - 112, h - 46, "placeholder cover", 12, -3, "#f3e3b8")
-    )
-    (PLACEHOLDERS / "book-cover.svg").write_text(svg(w, h, cover))
-
-    doodles = []
-    for _ in range(46):
-        x, y = rng.uniform(10, w - 10), rng.uniform(10, h - 10)
-        kind = rng.random()
-        if kind < 0.4:
-            doodles.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{rng.uniform(1.5, 3):.1f}" fill="#41706b" opacity=".35"/>')
-        elif kind < 0.75:
-            s = rng.uniform(4, 7)
-            doodles.append(stroke(rough_line(x - s, y, x + s, y, 0.3) + " " + rough_line(x, y - s, x, y + s, 0.3), "#41706b", 1.3, 0.35))
-        else:
-            doodles.append(stroke(smooth_open([(x - 6, y), (x - 2, y - 4), (x + 2, y), (x + 6, y - 4)]), "#b9533a", 1.3, 0.35))
-    endpaper = f'<rect width="{w}" height="{h}" fill="#efe3c6"/>' + "".join(doodles)
-    (PLACEHOLDERS / "endpaper.svg").write_text(svg(w, h, endpaper))
-
+def make_photo_placeholder():
+    reseed("photo")
     pw, ph = 400, 500
     hatch = "".join(stroke(rough_line(-40 + i * 16, ph, 120 + i * 16, 0, 0.6), "#7d8fa3", 1, 0.18) for i in range(34))
     person = (
@@ -497,7 +456,7 @@ def main():
     for folder in (ART, PLACEHOLDERS, UI, TEXTURES, SOUNDS):
         folder.mkdir(parents=True, exist_ok=True)
     make_box_faces()
-    make_book_art()
+    make_photo_placeholder()
     make_question_mark()
     (UI / "knife.svg").write_text(KNIFE_SVG)
     (UI / "knife-pressed.svg").write_text(KNIFE_PRESSED_SVG)

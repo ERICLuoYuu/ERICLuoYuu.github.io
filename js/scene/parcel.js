@@ -77,7 +77,7 @@ function buildBook(text) {
   const book = h('div', 'book3d');
   book.style.cssText = `left:${x}px;top:${y}px;--bw:${width};--bh:${height};--bt:${thickness};--rot:${rotate}deg`;
   const cover = h('button', 'book-top inside', { type: 'button', 'aria-label': text.bookLabel, tabindex: '-1' });
-  const title = h('span', 'book-title hand', { 'aria-hidden': 'true' });
+  const title = h('span', 'book-title', { 'aria-hidden': 'true' });
   title.textContent = text.bookTitle;
   const corners = [[0, 0], [width, 0], [width, height], [0, height]].map(([px, py]) => probe(px, py));
   cover.append(title, ...corners);

@@ -25,17 +25,18 @@ test.describe('the whole parcel, start to finish', () => {
     await expect(page.locator('#reader')).toBeVisible();
     await expect(page.locator('.flyer')).toBeHidden();
     expect((await bookOf(page)).visible).toEqual([0, 1]);
-    await expect(page.locator('#indicator-visual')).toHaveText('1 / 6');
+    const total = (await bookOf(page)).content; // follows content/book.md as the owner fills it in
+    await expect(page.locator('#indicator-visual')).toHaveText(`1 / ${total}`);
 
     // background box stays softly visible
     const filter = await page.$eval('#stage', (el) => getComputedStyle(el).filter);
     expect(filter).toContain('blur');
 
     await page.click('#reader-next');
-    await expect(page.locator('#indicator-visual')).toHaveText('2–3 / 6', { timeout: 4000 });
+    await expect(page.locator('#indicator-visual')).toHaveText(`2–3 / ${total}`, { timeout: 4000 });
     await page.waitForFunction(() => document.querySelector('#reader-prev').disabled === false);
     await page.click('#reader-prev');
-    await expect(page.locator('#indicator-visual')).toHaveText('1 / 6', { timeout: 4000 });
+    await expect(page.locator('#indicator-visual')).toHaveText(`1 / ${total}`, { timeout: 4000 });
 
     await page.click('#reader-close');
     await waitForState(page, 'overhead');
@@ -116,7 +117,7 @@ test.describe('phone', () => {
     expect(box.x).toBeGreaterThanOrEqual(0);
     expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize().width);
     await page.tap('#reader-next');
-    await expect(page.locator('#indicator-visual')).toHaveText('2 / 6', { timeout: 4000 });
+    await expect(page.locator('#indicator-visual')).toHaveText(`2 / ${status.content}`, { timeout: 4000 });
     await page.tap('#reader-close');
     await waitForState(page, 'overhead');
   });

@@ -42,7 +42,7 @@ export function createFlyer({ root, text }) {
   const leaf = h('div', 'flyer-leaf');
   const front = h('div', 'leaf-front');
   const back = h('div', 'leaf-back');
-  const title = h('span', 'flyer-title hand');
+  const title = h('span', 'flyer-title');
   title.textContent = text.bookTitle;
   front.append(title, h('span', 'leaf-shade'));
   back.append(h('span', 'leaf-shade'));

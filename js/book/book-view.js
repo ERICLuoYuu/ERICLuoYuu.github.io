@@ -210,7 +210,7 @@ export function createBookView({ mount, measureHost, ui, text, sound, reducedMot
     /** Show a friendly note instead of an empty reader. */
     showError(message) {
       const note = document.createElement('p');
-      note.className = 'reader-error hand';
+      note.className = 'reader-error';
       note.textContent = message;
       mount.replaceChildren(note);
     },

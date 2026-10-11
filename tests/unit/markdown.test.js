@@ -67,3 +67,15 @@ test('refuses schemes hidden behind control characters or backslashes', () => {
   assert.equal(safeUrl(String.raw`\evil.example`), null);
   assert.equal(renderInline('[x](\u0001javascript:alert(1))'), 'x');
 });
+
+test('## headings are numbered as manual steps, across pages', () => {
+  const { sections } = parseBook('# Parts\n\n## Unpack\n\n---\n\n## Read\n\n### Aside\n\n## Wave');
+  const headings = sections.flat().filter((b) => b.type === 'heading');
+  assert.deepEqual(headings.map((h) => [h.level, h.number ?? null]), [[1, null], [2, 1], [2, 2], [3, null], [2, 3]]);
+});
+
+test('step numbers do not leak between books', () => {
+  parseBook('## One\n\n## Two');
+  const { sections } = parseBook('## Again');
+  assert.equal(sections[0][0].number, 1);
+});

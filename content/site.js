@@ -49,8 +49,8 @@ export default {
   /**
    * Artwork layers. Keep the proportions noted beside each one (any size is
    * fine as long as the ratio matches; 3× the listed size looks crisp).
-   * SVG, PNG, JPG and WebP all work. The six box layers are finished
-   * cardboard art; the book cover, endpaper and question mark are stand-ins.
+   * SVG, PNG, JPG and WebP all work. The box layers and the booklet's
+   * cover and inside cover are finished art; the question mark is a stand-in.
    */
   art: {
     boxFront: 'assets/art/box-front.svg', // 420 × 220 — front and back walls, outside
@@ -59,8 +59,8 @@ export default {
     flapShort: 'assets/art/flap-short.svg', // 300 × 150 — the two short top flaps, outside
     boxInside: 'assets/art/box-inside.svg', // 420 × 220 — inner walls and flap undersides
     boxFloor: 'assets/art/box-floor.svg', // 420 × 300 — the floor inside the box
-    bookCover: 'assets/placeholders/book-cover.svg', // 360 × 500 — front cover of the little book
-    endpaper: 'assets/placeholders/endpaper.svg', // 360 × 500 — inside of the cover
+    bookCover: 'assets/art/manual-cover.svg', // 360 × 500 — front cover of the booklet (the title is set on top)
+    endpaper: 'assets/art/manual-endpaper.svg', // 360 × 500 — inside of the cover (the owner label sits at the bottom)
     questionMark: 'assets/placeholders/question-mark.svg', // ~200 × 280, transparent background
     desiccant: 'assets/art/desiccant.webp', // 42 × 60 — the silica-gel packet in the front-right corner
     instruction: '', // optional: a transparent image of your handwritten instruction

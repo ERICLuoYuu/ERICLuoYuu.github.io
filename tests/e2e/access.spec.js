@@ -63,7 +63,8 @@ test.describe('reduced motion', () => {
     await page.click('.book-top');
     await waitForState(page, 'reading', 5000);
     await page.click('#reader-next');
-    await expect(page.locator('#indicator-visual')).toHaveText('2–3 / 6', { timeout: 400 });
+    const total = (await bookOf(page)).content;
+    await expect(page.locator('#indicator-visual')).toHaveText(`2–3 / ${total}`, { timeout: 400 });
     await page.click('#reader-close');
     await waitForState(page, 'overhead', 5000);
     expect(problems).toEqual([]);

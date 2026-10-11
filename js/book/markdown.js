@@ -1,11 +1,13 @@
 /**
  * Markdown-lite for the introduction book.
  *
- *   # / ## / ###     handwritten headings
- *   > text           handwritten margin note
- *   - item           list
+ *   #                a title
+ *   ##               a numbered step (numbers count up through the whole book)
+ *   ###              a small heading
+ *   > text           a "!" note
+ *   - item           list (start an item with "2×" for a quantity badge)
  *   ![alt](src "caption")   image (relative path or https)
- *   **bold**  *italic*  ==handwriting==  [link](https://…)
+ *   **bold**  *italic*  ==highlight==  [link](https://…)
  *   ---              start a new page
  *   <!-- … -->       comments, ignored
  *
@@ -113,6 +115,16 @@ function parseSection(chunk) {
   return blocks;
 }
 
+/** Number every `##` heading as a manual step, counting across the whole book. */
+function numberSteps(sections) {
+  let step = 0;
+  return sections.map((blocks) => blocks.map((block) => {
+    if (block.type !== 'heading' || block.level !== 2) return block;
+    step += 1;
+    return { ...block, number: step };
+  }));
+}
+
 /** @returns {{sections: object[][]}} each section starts on a fresh page */
 export function parseBook(source) {
   const text = String(source ?? '')
@@ -122,5 +134,5 @@ export function parseBook(source) {
     .split(/^\s*-{3,}\s*$/m)
     .map(parseSection)
     .filter((blocks) => blocks.length > 0);
-  return { sections };
+  return { sections: numberSteps(sections) };
 }
