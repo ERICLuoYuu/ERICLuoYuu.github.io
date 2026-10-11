@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { openSite, stateOf, waitForState, touchDrag } from './helpers.js';
 import {
-  clothesOf, waitForSettled, pointOn, dragMouse, clearWithKeyboard, tabToBooklet, gridOver, filmPoints,
+  clothesOf, waitForSettled, pointOn, dragMouse, clearWithKeyboard, tabToBooklet, gridOver, filmPoints, pixelAt,
 } from './clothes-helpers.js';
 
 const shownKeys = (page) => page.locator('.clothes-key:not([hidden])');
@@ -46,6 +46,54 @@ test.describe('clothes in the box (desktop)', () => {
     await waitForState(page, 'sealed');
     expect(await opacity()).toBe('1');
     expect(await centreOf(page, 'pack')).toEqual(home);
+  });
+
+  test("the pack's clear film is drawn see-through and pale, not cut away", async ({ page }) => {
+    await openSite(page, '?jump=overhead');
+    await waitForState(page, 'overhead');
+    const [film] = await filmPoints(page, await gridOver(page, 'pack'));
+    expect(film, 'a point over clear film').toBeDefined();
+    const [r, g, b, a] = await pixelAt(page, film.x, film.y);
+    expect(a, 'partly see-through').toBeGreaterThan(0.25 * 255);
+    expect(a, 'partly see-through').toBeLessThan(0.85 * 255);
+    expect((r + g + b) / 3 / a, 'pale film, not a shadow').toBeGreaterThan(0.5);
+  });
+
+  test('cloth beneath the pack shows through its clear film', async ({ page }) => {
+    await openSite(page, '?jump=overhead');
+    await waitForState(page, 'overhead');
+    const box = await page.$eval('.book-top', (el) => el.getBoundingClientRect().toJSON());
+    const over = [];
+    for (let j = 1; j < 14; j += 1) {
+      for (let i = 1; i < 14; i += 1) over.push({ x: box.left + (box.width * i) / 14, y: box.top + (box.height * j) / 14 });
+    }
+    const pile = await page.evaluate((points) => points
+      .filter(({ x, y }) => window.__parcel.pick(x, y))
+      .map((p) => ({ ...p, colour: window.__parcel.pixel(p.x, p.y) })), over);
+
+    // The same pile with the pack lifted over it; everything lies asleep, so nothing moves.
+    await page.route('**/assets/clothes/pile.json', async (route) => {
+      const json = await (await route.fetch()).json();
+      const pack = json.garments.find((g) => g.id === 'pack');
+      pack.positions = pack.positions.map((v, i) => v + [200, 0, 70][i % 3]);
+      await route.fulfill({ json });
+    });
+    await page.goto('/?jump=overhead');
+    await waitForState(page, 'overhead');
+    const under = await filmPoints(page, pile);
+    const shown = await page.evaluate((points) => points.map((p) => ({ ...p, after: window.__parcel.pixel(p.x, p.y) })), under);
+    expect(shown.length, 'points where clear film lies over the pile').toBeGreaterThanOrEqual(6);
+    shown.forEach((p) => expect(p.after, `the film is drawn at (${p.x}, ${p.y})`).not.toEqual(p.colour));
+    // The lifted pack's contents shade some of the pile beneath: compare the lightest third with the darkest
+    // third, not single points, so one point in that shadow does not decide it.
+    const luma = ([r, g, b]) => 0.3 * r + 0.59 * g + 0.11 * b;
+    const mean = (points, key) => points.reduce((sum, p) => sum + luma(p[key]), 0) / points.length;
+    const sorted = [...shown].sort((p, q) => luma(q.colour) - luma(p.colour));
+    const third = Math.floor(sorted.length / 3);
+    const [light, dark] = [sorted.slice(0, third), sorted.slice(-third)];
+    const contrast = mean(light, 'colour') - mean(dark, 'colour');
+    expect(contrast, 'the film lies over garments of different shades').toBeGreaterThan(40);
+    expect(mean(light, 'after') - mean(dark, 'after'), 'they still differ through the film').toBeGreaterThan(0.3 * contrast);
   });
 
   test('the keyboard offers to move the garments, never the pack', async ({ page }) => {

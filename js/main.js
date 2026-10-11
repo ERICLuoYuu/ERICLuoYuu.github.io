@@ -349,6 +349,7 @@ async function start() {
     },
     garmentBox: (id) => app.clothes.screenBox(app.clothes.bodies.findIndex((g) => g.id === id)),
     project: (point) => app.clothes.project(point),
+    pixel: (x, y) => app.clothes.pixelAt(x, y),
   };
 }
 

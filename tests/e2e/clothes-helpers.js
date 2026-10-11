@@ -120,3 +120,6 @@ export async function filmPoints(page, points) {
     return hit?.id === 'pack' && hit.opacity > 0.3 && hit.opacity < 0.6;
   })), points);
 }
+
+/** The colour the clothes layer draws at (x, y): [r, g, b, a], premultiplied, 0–255. */
+export const pixelAt = (page, x, y) => page.evaluate(([px, py]) => window.__parcel.pixel(px, py), [x, y]);

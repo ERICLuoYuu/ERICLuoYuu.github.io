@@ -40,6 +40,7 @@ const DISABLED = Object.freeze({
   reset() {},
   clearAside() {},
   pickAt: () => null,
+  pixelAt: () => null,
   grab() {},
   dragTo() {},
   release() {},
@@ -174,6 +175,7 @@ function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
       reliefTexel: reliefs[i] ? [1 / reliefs[i].naturalWidth, 1 / reliefs[i].naturalHeight] : [0, 0],
       sheen: g.material.sheen ?? 0.3,
       bump: g.material.bump ?? 0,
+      film: isFilm[i],
     };
   });
   const makeRenderer = () => createRenderer(gl, { meshes, looks, occluders: occluderQuads() });
@@ -373,6 +375,15 @@ function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
       if (!visible) return null;
       const hit = pick(world, meshes, screenRay(camera.frame(), viewport(), sx, sy), pickable);
       return hit && { ...hit, opacity: alphaAt[hit.garment](hit.uv[0], hit.uv[1]) };
+    },
+    /** The colour drawn at screen point (sx, sy) in CSS pixels: [r, g, b, a], premultiplied, 0–255 (tests). */
+    pixelAt(sx, sy) {
+      if (!visible || lost) return null;
+      draw(); // read back in the same task, before the browser presents and clears the buffer
+      const ratio = canvas.width / (canvas.clientWidth || innerWidth);
+      const out = new Uint8Array(4);
+      gl.readPixels(Math.round(sx * ratio), canvas.height - 1 - Math.round(sy * ratio), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, out);
+      return [...out];
     },
     grab,
     dragTo,
