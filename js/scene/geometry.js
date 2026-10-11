@@ -22,6 +22,22 @@ export const CONTENTS = Object.freeze({
   desiccant: Object.freeze({ x: 368, y: 232, width: 42, height: 60, thickness: 3, rotate: -12 }),
 });
 
+const RAD = Math.PI / 180;
+
+/** CSS rotateX(deg) applied to a point (x right, y down, z toward the viewer). */
+export function rotateX([x, y, z], deg) {
+  const c = Math.cos(deg * RAD);
+  const s = Math.sin(deg * RAD);
+  return [x, y * c - z * s, y * s + z * c];
+}
+
+/** CSS rotateZ(deg) applied to a point: clockwise on screen. */
+export function rotateZ([x, y, z], deg) {
+  const c = Math.cos(deg * RAD);
+  const s = Math.sin(deg * RAD);
+  return [x * c - y * s, x * s + y * c, z];
+}
+
 /** Camera angles (degrees) and interior light for each view. */
 export const VIEWS = Object.freeze({
   threeQuarter: Object.freeze({ tilt: 54, spin: -34, light: 0 }),

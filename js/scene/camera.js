@@ -15,9 +15,11 @@ const smoothstep = (a, b, t) => {
 export function createCamera({ stage, camera, parcel }) {
   let view = 'threeQuarter';
   let current = frameFor(view, innerWidth, innerHeight);
+  const listeners = new Set();
 
   const apply = (f) => {
     current = f;
+    listeners.forEach((fn) => fn(current));
     stage.style.perspective = `${f.perspective.toFixed(1)}px`;
     camera.style.setProperty('--tilt', f.tilt.toFixed(3));
     camera.style.setProperty('--spin', f.spin.toFixed(3));
@@ -52,5 +54,17 @@ export function createCamera({ stage, camera, parcel }) {
   const refit = () => apply({ ...frameFor(view, innerWidth, innerHeight), light: current.light });
 
   apply(current);
-  return { set, move, refit, get view() { return view; } };
+  return {
+    set,
+    move,
+    refit,
+    get view() { return view; },
+    /** The frame last applied (tilt, spin, zoom, pan, perspective, light). */
+    frame: () => current,
+    /** Call fn with every new frame; returns an unsubscribe function. */
+    onChange: (fn) => {
+      listeners.add(fn);
+      return () => listeners.delete(fn);
+    },
+  };
 }
