@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))  # run as a script: mak
 
 from clothes.canvas import PX, Canvas  # noqa: E402
 from clothes.fit import CELL, fit, grid_shape  # noqa: E402
-from clothes.traditional import qipao  # noqa: E402
+from clothes.traditional import blouse, mamianqun, qipao  # noqa: E402
 from pack_body import pack_record  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -53,6 +53,8 @@ def material(bend: float, friction: float, sheen: float, bump: float) -> dict:
 
 GARMENTS = [
     Garment("qipao", "qipao", (190, 400), material(1e-4, 0.35, 0.6, 1.6), (0.5, 0.02), qipao),
+    Garment("blouse", "mandarin-collar blouse", (300, 230), material(1.5e-4, 0.4, 0.25, 1.3), (0.5, 0.03), blouse),
+    Garment("mamianqun", "horse-face skirt", (280, 262), material(6e-5, 0.5, 0.3, 1.8), (0.5, 0.55), mamianqun),
 ]
 
 
