@@ -1,6 +1,6 @@
 # Vacuum pack and detailed garments — design
 
-Date: 2026-10-11 · Status: approved in chat, awaiting spec review
+Date: 2026-10-11 · Status: approved; **Revision B** (below the decisions) awaiting review
 
 Builds on `2026-10-11-clothes-pile-design.md` (the cloth layer, the pile and
 the booklet lock stay as specified there unless this document says otherwise).
@@ -25,13 +25,196 @@ Two refinements of the overhead view:
 | Topic | Decision |
 |-------|----------|
 | Separation | From the flat PNG (no layered file needed): the probe reproduced the original exactly over white and looked right over cardboard |
-| Pack spot | On the floor, left, its long edge against the left wall; the seal border curls up the wall a little |
+| Pack spot | On the floor, left, its long edge against the left wall; the seal border curls up the wall a little *(superseded by Revision B: full depth, movable, no curled edge)* |
 | Garment art | Drawn in code (`tools/generate_clothes.py`), no brands, no text |
 | Lineup | The same eight garments, redrawn with distinct cuts |
-| Holding | Slid low with its shape intact: a palm-sized hold just clear of the pile |
+| Holding | Slid low with its shape intact: a palm-sized hold just clear of the pile *(distances rescaled in Revision B)* |
 | Approach | A — keep today's simulation density; make outlines, folds, art and lighting finer |
 
 Nothing about the owner is invented; the artwork's content is not altered.
+
+## Revision B — figure scale, a movable pack, books
+
+Asked by the owner after checkpoint A (the pack looked right). Where this
+section and §1–§5 disagree, this section wins.
+
+The owner's words:
+- "the left part should account for 2/3 of the space"
+- "the size of garments should match the size of the model"
+- "the pile of garments can be at the upper right, and the lower right part can
+  place some books I like": *Hunter × Hunter* manga, a German-Chinese
+  dictionary, *One Hundred Years of Solitude* (Gabriel García Márquez),
+  *Siddhartha* (Hermann Hesse)
+- "the model should also be able to move"
+
+| Topic | Decision |
+|-------|----------|
+| Pack size | Full depth, upright: 181 × 290 units (≈ 1.6 × today's area, 44 % of the floor's width). Exactly 2/3 would need the pack turned sideways or a much deeper box; the owner chose this instead |
+| Pack moves | It joins the clothes simulation as a stiff, heavy sheet: visitors pick it up anywhere, it lifts and flexes a little like a thick vacuum bag, then settles flat. Its edge no longer curls up the wall |
+| Garment scale | Every garment is sized to fit the figure in the pack, about 0.3–0.5 × today's sizes |
+| Layout | Left: the pack. Upper right: the pile, hiding a smaller booklet. Lower right, about a quarter of the floor: the four books and the desiccant |
+| Books | Drawn in code: plain typographic covers with the titles as the owner wrote them; no publisher names, logos or cover art |
+
+### B1. Layout
+
+Floor 420 × 300; the walls' inner faces are at 2 and 418 (x), 2 and 298 (y).
+"Upper" is the back of the box, at the top of the overhead view.
+
+| Item | Where | Size |
+|------|-------|------|
+| Pack | x 6–187, y 5–295, square to the left wall | 181 × 290, flat |
+| Booklet | upper right, centred near (300, 78), turned 4° | 96 × 134 (today 164 × 228, same proportions) |
+| Pile | upper right, over the booklet, within about x 195–418, y 2–165 | — |
+| Books | lower right, about x 195–418, y 158–298 (≈ ¼ of the floor) | B5 |
+| Desiccant | front right, lying on one of the books | 42 × 60, as today |
+
+The booklet's cover lettering is sized from the booklet (`--bw`), so it shrinks
+with it; the reading view is unchanged. On a phone the booklet is about
+70 × 95 CSS px, still a comfortable tap target.
+
+### B2. Garments fit the figure
+
+The figure in the pack (head to sole ≈ 248 units at the pack's 290-unit
+height) sets each garment's length; the generator re-measures these values
+from the cut-out:
+
+| Measure | ≈ units |
+|---------|--------:|
+| Shoulder width | 54 |
+| Shoulder → waist | 55 |
+| Shoulder → hip | 83 |
+| Waist → knee | 76 |
+| Waist → mid-calf | 103 |
+| Waist → ankle | 127 |
+| Shoulder → mid-calf | 158 |
+
+| Garment | Spans | ≈ width × length |
+|---------|-------|------------------|
+| Qipao | shoulder → mid-calf | 75 × 158 |
+| Mandarin-collar blouse | shoulder → hip | 108 × 83 |
+| Horse-face skirt | waist → ankle | 136 × 127 |
+| White tee | shoulder → hip | 96 × 83 |
+| Breton top | shoulder → hip | 96 × 83 |
+| Slip skirt | waist → mid-calf | 76 × 103 |
+| Ruched top | shoulder → waist (cropped, like the one in the photo) | 64 × 55 |
+| Floral skirt | waist → mid-calf | 79 × 103 |
+
+The generator still draws in §2's pattern units (all of §2's cuts and details
+stand) and scales the result by each garment's *fit* = target length ÷ pattern
+length: a record's `size` is the pattern size × fit and its `pxPerUnit` is
+`PX ÷ fit`, so the textures keep their detail and the 3 MB download budget is
+unchanged. The simulation grid is cut at **6 units per cell** for every
+garment, whatever its fit.
+
+On screen a tee is about 160 px wide on a 1280 × 800 desktop and 65 px on a
+phone: silhouettes, collars, closures, prints and hem bands read; seams and
+stitching show only on high-density screens.
+
+### B3. The simulation at the new scale
+
+| Setting | Today | Revision B | Why |
+|---------|------:|-----------:|-----|
+| Cell | 10 | 6 | Fold detail in proportion to the smaller garments |
+| Thickness | 7.5 | 4.5 | Covers the 4.2-unit gap in the middle of a 6-unit cell |
+| Substeps | 10 | 16 | No particle moves more than 0.1 × thickness per substep; 16 keeps a held item following the pointer at ≈ 430 units/s (today 450) |
+| Grip radius | 13 | 8 | About 1.3 cells, as before |
+| Lift | 20 | 12 | Clear of the pile by the same share of a garment |
+
+Particles drop from about 5,000 to about 1,900 for the garments plus about
+1,450 for the pack, so the work per frame (particles × substeps) stays within
+10 % of today's. Gravity and air drag are re-tuned so §4 still holds at the
+new scale: a dropped garment lands within 0.2 s of a fall of one garment
+length and settles within 1.5 s.
+
+### B4. The pack as a body
+
+- **Data.** `garments.json` gains the pack as a ninth body (`id: "pack"`,
+  `kind: "film"`), textured with `vacuum-pack.webp`, its rest pose the B1
+  rectangle lying flat. The pile builder places it there and never folds it.
+- **Material.** Very stiff in bending, firm in stretch, each particle 4 × as
+  heavy as a garment's (it is heavy and dense), plastic friction, a strong
+  sheen for the film's gloss.
+- **Relief.** `prepare_pack.py` also writes the bulge height field it already
+  computes as a relief map in the garments' format; the renderer lights it
+  with the box's one light, like cloth. The CSS shade overlay stays for the
+  fallback below.
+- **Drawing.** The film is translucent. The pack is drawn after the opaque
+  garments, blended (premultiplied), depth-tested without writing depth: cloth
+  beneath shows through the clear film, cloth above hides it. Its shadow comes
+  from its contents; the clear film casts none.
+- **Holding.** A wide grip (radius 30) lifted only a little (6 units), so the
+  pack flexes gently instead of hanging from one point; released, it settles
+  flat.
+- **Picking.** Anywhere on the pack, clear film included.
+- **Cover.** Laid over the booklet, the pack hides it like cloth does.
+- **Fallback.** Without WebGL2 (clothes layer disabled) the static CSS pack
+  from §1 stays, flat, without its edge strip. With the clothes layer, the CSS
+  pack hides when the layer is first shown, at the same spot, so nothing jumps.
+- **Access.** The pack is not in the keyboard's "move aside" order (it never
+  covers the booklet at the start); its description (`photo.alt`) stays
+  available to screen readers.
+
+### B5. The books
+
+`tools/generate_books.py` draws each cover and its edge colours as WebP:
+titles exactly as the owner wrote them, open-licensed fonts, no publisher
+names, logos or cover art. At about 2.5–3 × the figure's scale the titles
+read on a desktop screen.
+
+| Book | w × h × thickness | Cover |
+|------|-------------------|-------|
+| *Hunter × Hunter* (manga) | 50 × 78 × 7 | small manga-volume format, bold title |
+| German-Chinese dictionary | 70 × 96 × 20 | cloth-bound hardcover, title on a label |
+| *One Hundred Years of Solitude*, Gabriel García Márquez | 58 × 88 × 10 | paperback |
+| *Siddhartha*, Hermann Hesse | 56 × 86 × 8 | paperback |
+
+In the scene each book is a CSS-3D block like the booklet (cover on top, page
+edges and spine on the sides), slightly turned; the manga lies on the
+dictionary. Each is a collider (cloth and the pack rest on them) and an
+occluder. Cover images carry alt text with title and author, and the overhead
+announcement mentions "some books".
+
+### B6. Build order (replaces the one below)
+
+Done: 1 (pack tool), 2 (CSS pack, static collider; checkpoint A passed).
+
+- **2b. Layout and scale.** B1's places; today's garment records scaled by
+  their fit so the box works at once; B3's settings; the pile restaged in the
+  upper right; booklet lettering relative to its size.
+- **2c. Books.** Generator, blocks, colliders, alt text.
+- **3–5** as planned (core cells, smooth surface, renderer).
+- **5b. Film drawing.** Translucent pass, relief for the pack, pick threshold.
+- **5c. The pack as a body.** Data record, heavy stiff material, wide grip,
+  fallback hand-over; the static pack collider goes.
+- **6–8** garments, with fit and the 6-unit grid.
+- **9** holding and weight, re-tuned at the new scale.
+- **10** the pile (upper right, signature features).
+- **11** release.
+
+Checkpoint A′ after 2c (layout, scale and books, desktop and phone shots);
+checkpoint B (the qipao) as before.
+
+### B7. Testing added
+
+- Geometry: pack, booklet and books inside the walls without overlapping;
+  the booklet within the upper right, the books within the lower-right
+  quarter.
+- Data: each garment's length within ±10 % of its B2 target; the pack body
+  record; the pile hides the booklet and leaves the pack uncovered.
+- Solver: the pack held by its wide grip stays nearly flat; a garment dropped
+  on it rests on it; it rests on a book; particles × substeps within 10 % of
+  today's.
+- E2E: a garment under the pack shows through the film; pointing at clear
+  film picks the pack; without WebGL2 the CSS pack shows; the four covers
+  load and their alt texts carry the titles.
+
+### B8. Risks
+
+- On phones the small garments read mostly by silhouette and colour.
+- A stiff sheet in XPBD sags when held at one point: hence the wide grip and
+  small lift, checked by a deflection test.
+- Only one translucent body exists, so no sorting between translucent bodies
+  is needed; a second would need it.
 
 ## 1. The vacuum pack
 
