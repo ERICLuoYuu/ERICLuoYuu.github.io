@@ -21,7 +21,8 @@ export const CONTENTS = Object.freeze({
   pack: Object.freeze({ x: 6, y: 5, width: 181, height: 290, thickness: 4, rotate: 0 }),
   // The booklet, upper right, where the clothes pile hides it.
   book: Object.freeze({ x: 252, y: 11, width: 96, height: 134, thickness: 8, rotate: 4 }),
-  desiccant: Object.freeze({ x: 357, y: 205, width: 42, height: 60, thickness: 3, rotate: -12, on: 'siddhartha' }),
+  // The silica-gel packet, tucked into the front-right corner.
+  desiccant: Object.freeze({ x: 387, y: 260, width: 24, height: 34, thickness: 3, rotate: 8 }),
 });
 
 /**
@@ -33,7 +34,7 @@ export const BOOKS = Object.freeze([
   Object.freeze({ id: 'dictionary', x: 202, y: 184, width: 70, height: 96, thickness: 20, rotate: -6 }),
   Object.freeze({ id: 'hunter-x-hunter', x: 212, y: 192, width: 50, height: 78, thickness: 7, rotate: 7, on: 'dictionary' }),
   Object.freeze({ id: 'solitude', x: 282, y: 174, width: 58, height: 88, thickness: 10, rotate: 4 }),
-  Object.freeze({ id: 'siddhartha', x: 352, y: 190, width: 56, height: 86, thickness: 8, rotate: -5 }),
+  Object.freeze({ id: 'siddhartha', x: 352, y: 166, width: 56, height: 86, thickness: 8, rotate: -5 }),
 ]);
 
 /** Height of the surface an item lies on: the top of the book its `on` names, or the floor. */

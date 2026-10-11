@@ -116,7 +116,7 @@ test('the books lie in the lower-right quarter, on the floor or on another book'
 });
 
 test('what lies on a book lies within its cover, at its height', () => {
-  [...BOOKS.filter((b) => b.on), { ...CONTENTS.desiccant, id: 'desiccant' }].forEach((item) => {
+  BOOKS.filter((b) => b.on).forEach((item) => {
     const below = BOOKS.find((b) => b.id === item.on);
     corners(item).forEach((p) => {
       const [u, v] = local(p, below);
@@ -126,4 +126,14 @@ test('what lies on a book lies within its cover, at its height', () => {
   });
   assert.equal(baseOf(CONTENTS.book), 0);
   assert.throws(() => baseOf({ on: 'nowhere' }), /nowhere/);
+});
+
+test('the desiccant packet lies small, on the floor, in the front-right corner', () => {
+  const packet = { ...CONTENTS.desiccant, id: 'desiccant' };
+  const f = footprint(packet);
+  assert.equal(baseOf(packet), 0, 'on the floor');
+  assert.ok(packet.width <= 26 && packet.height <= 36, 'about the size of a real packet beside the books');
+  assert.ok(f.right >= BOX.width - 10 && f.bottom >= BOX.depth - 10, 'tucked into the corner');
+  [...BOOKS, { ...CONTENTS.book, id: 'booklet' }, { ...CONTENTS.pack, id: 'pack' }]
+    .forEach((b) => assert.ok(!overlaps(packet, b), `clear of ${b.id}`));
 });

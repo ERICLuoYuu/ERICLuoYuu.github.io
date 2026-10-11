@@ -66,7 +66,7 @@ export default {
     bookCover: 'assets/art/manual-cover.svg', // 360 × 500 — front cover of the booklet (the title is set on top)
     endpaper: 'assets/art/manual-endpaper.svg', // 360 × 500 — inside of the cover (the owner label sits at the bottom)
     questionMark: 'assets/placeholders/question-mark.svg', // ~200 × 280, transparent background
-    desiccant: 'assets/art/desiccant.webp', // 42 × 60 — the silica-gel packet in the front-right corner
+    desiccant: 'assets/art/desiccant.webp', // 24 × 34 — the silica-gel packet in the front-right corner
     instruction: '', // optional: a transparent image of your handwritten instruction
   },
 
