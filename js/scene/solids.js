@@ -8,7 +8,7 @@ import {
   BOX, CONTENTS, BOOKS, FLAP_OPEN, baseOf, rotateX, rotateZ,
 } from './geometry.js';
 
-const WALL = 2; // .face.inner sits 2px inside the outer face
+export const WALL = 2; // .face.inner sits 2px inside the outer face
 const FLAP = 1; // .flap .face.inner sits 1px under the outer face
 
 /** Each side, as scene.css builds it: a front-facing part turned about the box centre. */

@@ -299,3 +299,21 @@ test('carried off the pile onto bare floor, the hand sinks back to just clear of
   // resting on the floor a particle lies THICKNESS / 2 up; the hand holds it 12 above that, not 12 above where it was picked up
   assert.ok(world.grip.to[2] < THICKNESS / 2 + 12 + 1, `held at ${world.grip.to[2].toFixed(1)} over the floor`);
 });
+
+for (const [wall, from, to] of [['left', [25, 150], [8, 150]], ['back', [96, 20], [96, 6]]]) {
+  test(`dragged towards the ${wall} wall and let go, the pack stays inside the box`, () => {
+    const { world, hand } = packScene();
+    const i = nearest(world, ...from);
+    hand.grab(hitAt(world, i), world.pos[3 * i], world.pos[3 * i + 1]);
+    for (let f = 1; f <= 30; f += 1) {
+      hand.dragTo(from[0] + ((to[0] - from[0]) * f) / 30, from[1] + ((to[1] - from[1]) * f) / 30);
+      frames(world, hand, 1);
+    }
+    hand.release();
+    frames(world, hand, 240);
+    const [xs, ys] = [0, 1].map((k) => [...Array(world.count).keys()].map((j) => world.pos[3 * j + k]));
+    // the walls' inner faces are 2 units in
+    assert.ok(Math.min(...xs) > 2 && Math.max(...xs) < BOX.width - 2, `x from ${Math.min(...xs).toFixed(1)} to ${Math.max(...xs).toFixed(1)}`);
+    assert.ok(Math.min(...ys) > 2 && Math.max(...ys) < BOX.depth - 2, `y from ${Math.min(...ys).toFixed(1)} to ${Math.max(...ys).toFixed(1)}`);
+  });
+}

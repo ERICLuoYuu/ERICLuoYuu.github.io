@@ -39,16 +39,25 @@ function boxTop({ center, axes, half }, x, y, reach) {
  * neither does cloth that is awake: cloth lying on the held garment comes up
  * with it, and counted, it would lift the hand that lifts it, without end.
  */
-export function supportHeight(world, colliders, x, y, { reach = 20, skip = -1, moving = true } = {}) {
+export function supportHeight(world, colliders, x, y, options) {
+  return supportUnder(world, colliders, [[x, y]], options);
+}
+
+/** The same for a footprint: the highest support within `reach` of any of `points` (a held patch). */
+export function supportUnder(world, colliders, points, { reach = 20, skip = -1, moving = true } = {}) {
   let top = 0;
-  colliders.forEach((box) => { top = Math.max(top, boxTop(box, x, y, reach)); });
+  colliders.forEach((box) => points.forEach(([x, y]) => { top = Math.max(top, boxTop(box, x, y, reach)); }));
+  let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
+  points.forEach(([x, y]) => {
+    [x0, y0, x1, y1] = [Math.min(x0, x), Math.min(y0, y), Math.max(x1, x), Math.max(y1, y)];
+  });
   const { pos, garmentOf, thickness, awake } = world;
   for (let i = 0; i < world.count; i += 1) {
     const g = garmentOf[i];
     if (g === skip || (!moving && awake[g])) continue;
-    if (Math.abs(pos[3 * i] - x) <= reach && Math.abs(pos[3 * i + 1] - y) <= reach) {
-      top = Math.max(top, pos[3 * i + 2] + thickness);
-    }
+    const [px, py, z] = [pos[3 * i], pos[3 * i + 1], pos[3 * i + 2] + thickness];
+    if (z <= top || px < x0 - reach || px > x1 + reach || py < y0 - reach || py > y1 + reach) continue;
+    if (points.some(([x, y]) => Math.abs(px - x) <= reach && Math.abs(py - y) <= reach)) top = z;
   }
   return top;
 }
