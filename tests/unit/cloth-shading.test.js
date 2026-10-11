@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildMesh } from '../../js/cloth/mesh.js';
 import {
-  LIGHT_DIR, SHADOW_VOLUME, lightMatrix, vertexNormals, neighbourLists, cavity,
+  LIGHT_DIR, SHADOW_VOLUME, lightMatrix, vertexNormals, neighbourLists, cavity, CREASE,
 } from '../../js/cloth/shading.js';
 
 const apply = (m, [x, y, z]) => [0, 1, 2, 3].map((r) => m[r] * x + m[4 + r] * y + m[8 + r] * z + m[12 + r]);
@@ -84,4 +84,14 @@ test('cloth crushed to a point still gets a usable, upward normal', () => {
   const out = new Float32Array(3 * mesh.count);
   vertexNormals(new Float32Array(3 * mesh.count), 0, mesh.tris, out);
   for (let i = 0; i < mesh.count; i += 1) assert.deepEqual([...out.slice(3 * i, 3 * i + 3)], [0, 0, 1]);
+});
+
+test('a finer mesh can ask for a stronger crease', () => {
+  const pos = new Float32Array([0, 0, -1, 1, 0, 0, -1, 0, 0]); // vertex 0 lies 1 below its two neighbours
+  const lists = neighbourLists({ count: 3, stretch: [{ a: 0, b: 1 }, { a: 0, b: 2 }] });
+  const out = new Float32Array(3);
+  cavity(pos, 0, lists, out);
+  const normal = 1 - out[0];
+  cavity(pos, 0, lists, out, { crease: CREASE * 4 });
+  assert.ok(Math.abs((1 - out[0]) - 4 * normal) < 1e-6);
 });

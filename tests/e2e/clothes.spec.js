@@ -16,6 +16,24 @@ const distance = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 test.describe('clothes in the box (desktop)', () => {
   test.skip(({ isMobile }) => isMobile, 'mouse and keyboard');
 
+  test('the open hand shows exactly where cloth is visible, never over a transparent margin', async ({ page }) => {
+    await openSite(page, '?jump=overhead');
+    await waitForState(page, 'overhead');
+    const box = await page.evaluate(() => window.__parcel.garmentBox('qipao'));
+    for (const row of [0.08, 0.3, 0.7]) {
+      for (let k = 0; k <= 24; k += 1) {
+        const x = box.left + (box.width * k) / 24;
+        const y = box.top + box.height * row;
+        await page.mouse.move(x, y);
+        const [picked, hover] = await page.evaluate(([px, py]) => [
+          window.__parcel.pick(px, py) !== null,
+          document.querySelector('.stage').classList.contains('over-garment'),
+        ], [x, y]);
+        expect(hover, `hand at (${x.toFixed(0)}, ${y.toFixed(0)})`).toBe(picked);
+      }
+    }
+  });
+
   test('the booklet is locked under the pile: clicking it does nothing yet', async ({ page }) => {
     const problems = await openSite(page, '?jump=overhead');
     await waitForState(page, 'overhead');

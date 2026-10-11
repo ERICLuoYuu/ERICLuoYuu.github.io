@@ -99,22 +99,24 @@ export function neighbourLists({ count, stretch }) {
   return { start, ids: Int32Array.from(lists.flat()) };
 }
 
-const CREASE = 0.035; // darkening per unit a vertex sits below its neighbours
+export const CREASE = 0.035; // darkening per unit a vertex sits below its neighbours
 const DARKEST = 0.72;
 const BRIGHTEST = 1.06;
 
 /**
  * Ambient darkening per vertex: cloth lying lower than its neighbours sits
  * in a crease and gets less light. Writes one factor (about 0.72…1.06) per
- * vertex to `out`; flat cloth gets exactly 1.
+ * vertex to `out`; flat cloth gets exactly 1. `crease` scales the darkening —
+ * a finer mesh needs more, since a crease's depth below its neighbours
+ * shrinks with the square of their spacing.
  */
-export function cavity(pos, offset, { start, ids }, out) {
+export function cavity(pos, offset, { start, ids }, out, { crease = CREASE } = {}) {
   const base = 3 * offset;
   for (let i = 0; i < out.length; i += 1) {
     let sum = 0;
     for (let k = start[i]; k < start[i + 1]; k += 1) sum += pos[base + 3 * ids[k] + 2];
     const n = start[i + 1] - start[i];
     const depth = n > 0 ? pos[base + 3 * i + 2] - sum / n : 0;
-    out[i] = depth === 0 ? 1 : Math.min(BRIGHTEST, Math.max(DARKEST, 1 + depth * CREASE));
+    out[i] = depth === 0 ? 1 : Math.min(BRIGHTEST, Math.max(DARKEST, 1 + depth * crease));
   }
 }

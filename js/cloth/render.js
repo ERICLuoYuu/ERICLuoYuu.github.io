@@ -13,7 +13,10 @@
  * matrices. This module only talks to WebGL.
  */
 
-import { LIGHT_DIR, lightMatrix, vertexNormals, neighbourLists, cavity } from './shading.js';
+import {
+  LIGHT_DIR, CREASE, lightMatrix, vertexNormals, neighbourLists, cavity,
+} from './shading.js';
+import { createSmoother } from './smooth.js';
 
 const SHADOW_SIZE = 2048;
 const SHADOW_STRENGTH = 0.38; // darkest tint a cloth shadow lays on the box, in full light
@@ -21,6 +24,8 @@ const SHADOW_BIAS = 0.0015; // ≈ 1.2 units of light depth
 const DROP = 2.5; // particles float half a thickness above what they lie on; draw the cloth a little lower
 const DARK = [0x14 / 255, 0x0d / 255, 0x07 / 255]; // .inside::after
 const ATTRIBUTES = ['aPos', 'aNormal', 'aUv', 'aCavity'];
+const FINE_CREASE = CREASE * 4; // the drawn mesh is twice as fine: creases sit a quarter as deep below neighbours
+const FLAT_RELIEF = new Uint8Array([128]); // a garment without a relief map is lit as plain fabric
 
 const PCF = `
 uniform highp sampler2DShadow uShadow;
@@ -100,6 +105,9 @@ const CLOTH_FS = `#version 300 es
 precision highp float;
 ${PCF}
 uniform sampler2D uTex;
+uniform sampler2D uRelief;
+uniform vec2 uReliefTexel;
+uniform float uBump;
 uniform vec3 uEye;
 uniform vec3 uLightDir;
 uniform float uSheen;
@@ -110,6 +118,27 @@ in vec3 vShadow;
 in vec2 vUv;
 in float vCavity;
 out vec4 outColor;
+
+// Tilt the normal by the relief map's slope along the cloth's own u and v
+// directions. The tangent frame comes from screen-space derivatives
+// (Schüler's cotangent frame), so no tangents need storing per vertex.
+vec3 relief(vec3 n) {
+  float l = texture(uRelief, vUv - vec2(uReliefTexel.x, 0.0)).r;
+  float r = texture(uRelief, vUv + vec2(uReliefTexel.x, 0.0)).r;
+  float d = texture(uRelief, vUv - vec2(0.0, uReliefTexel.y)).r;
+  float u = texture(uRelief, vUv + vec2(0.0, uReliefTexel.y)).r;
+  vec3 dpx = dFdx(vPos);
+  vec3 dpy = dFdy(vPos);
+  vec2 dtx = dFdx(vUv);
+  vec2 dty = dFdy(vUv);
+  vec3 px = cross(dpy, n);
+  vec3 py = cross(n, dpx);
+  vec3 tu = px * dtx.x + py * dty.x;
+  vec3 tv = px * dtx.y + py * dty.y;
+  float scale = inversesqrt(max(max(dot(tu, tu), dot(tv, tv)), 1e-12));
+  return normalize(n - uBump * scale * ((r - l) * tu + (u - d) * tv));
+}
+
 void main() {
   vec4 tex = texture(uTex, vUv); // premultiplied on upload
   // a crisp cut-out edge, about one pixel wide, whatever the zoom
@@ -121,6 +150,7 @@ void main() {
   vec3 toEye = normalize(uEye - vPos);
   bool back = dot(n, toEye) < 0.0;
   if (back) n = -n;
+  n = relief(n);
   float shade = max(0.0, dot(n, uLightDir)) * 0.6 + 0.4; // wrapped: soft fabric, no harsh terminator
   float sun = sunlit(vShadow);
   vec3 h = normalize(uLightDir + toEye);
@@ -193,6 +223,22 @@ function createTexture(gl, image, anisotropy) {
   return texture;
 }
 
+/** Single-channel relief texture; a 1 × 1 plain one when the garment has none. */
+function createReliefTexture(gl, image) {
+  const texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+  if (image) gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, gl.RED, gl.UNSIGNED_BYTE, image);
+  else gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 1, 1, 0, gl.RED, gl.UNSIGNED_BYTE, FLAT_RELIEF);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+  gl.generateMipmap(gl.TEXTURE_2D);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return texture;
+}
+
 function vertexBuffer(gl, location, size, data, usage) {
   const buffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -202,29 +248,36 @@ function vertexBuffer(gl, location, size, data, usage) {
   return buffer;
 }
 
-/** Buffers, texture and scratch arrays for one garment. */
-function createGarment(gl, mesh, image, sheen, anisotropy) {
+/** Buffers, textures and scratch arrays for one garment, drawn as its smooth surface. */
+function createGarment(gl, mesh, { image, relief, reliefTexel, sheen, bump }, anisotropy) {
+  const smooth = createSmoother(mesh);
+  if (smooth.count > 65535) throw new Error('a garment has too many points to draw with 16-bit indices');
   const vao = gl.createVertexArray();
   gl.bindVertexArray(vao);
-  const normals = new Float32Array(3 * mesh.count);
-  const shading = new Float32Array(mesh.count).fill(1);
+  const positions = smooth.evaluate(mesh.rest, 0, new Float32Array(3 * smooth.count));
+  const normals = new Float32Array(3 * smooth.count);
+  const shading = new Float32Array(smooth.count).fill(1);
   const garment = {
-    mesh,
+    smooth,
     sheen,
+    bump,
     vao,
+    positions,
     normals,
     shading,
-    neighbours: neighbourLists(mesh),
-    position: vertexBuffer(gl, ATTRIBUTES.indexOf('aPos'), 3, mesh.rest, gl.DYNAMIC_DRAW),
+    neighbours: neighbourLists({ count: smooth.count, stretch: smooth.edges }),
+    position: vertexBuffer(gl, ATTRIBUTES.indexOf('aPos'), 3, positions, gl.DYNAMIC_DRAW),
     normal: vertexBuffer(gl, ATTRIBUTES.indexOf('aNormal'), 3, normals, gl.DYNAMIC_DRAW),
-    uv: vertexBuffer(gl, ATTRIBUTES.indexOf('aUv'), 2, mesh.uv, gl.STATIC_DRAW),
+    uv: vertexBuffer(gl, ATTRIBUTES.indexOf('aUv'), 2, smooth.uv, gl.STATIC_DRAW),
     cavity: vertexBuffer(gl, ATTRIBUTES.indexOf('aCavity'), 1, shading, gl.DYNAMIC_DRAW),
-    count: mesh.tris.length,
+    count: smooth.tris.length,
     texture: createTexture(gl, image, anisotropy),
+    relief: createReliefTexture(gl, relief),
+    reliefTexel, // one texel of the relief file: the bump keeps its strength at any upload size
   };
   const indices = gl.createBuffer();
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indices);
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, Uint16Array.from(mesh.tris), gl.STATIC_DRAW);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, Uint16Array.from(smooth.tris), gl.STATIC_DRAW);
   gl.bindVertexArray(null);
   return garment;
 }
@@ -241,12 +294,11 @@ function createOccluders(gl, quads) {
 /**
  * @param gl         a WebGL2 context (antialias on, premultiplied alpha)
  * @param meshes     each garment's mesh (mesh.js), in world order
- * @param images     each garment's decoded texture image
- * @param sheens     each garment's sheen strength, 0…1
+ * @param looks      each garment's {image, relief (or null), reliefTexel, sheen 0…1, bump}
  * @param occluders  quads of the box's solid surfaces (solids.occluderQuads)
  * @returns {{update(world, garments:number[]): void, draw(view): void}}
  */
-export function createRenderer(gl, { meshes, images, sheens, occluders }) {
+export function createRenderer(gl, { meshes, looks, occluders }) {
   const anisotropy = gl.getExtension('EXT_texture_filter_anisotropic');
   const programs = {
     shadow: createProgram(gl, 'shadow', SHADOW_VS, SHADOW_FS),
@@ -254,20 +306,20 @@ export function createRenderer(gl, { meshes, images, sheens, occluders }) {
     cloth: createProgram(gl, 'cloth', CLOTH_VS, CLOTH_FS),
   };
   const shadowMap = createShadowMap(gl);
-  const garments = meshes.map((mesh, g) => createGarment(gl, mesh, images[g], sheens[g], anisotropy));
+  const garments = meshes.map((mesh, g) => createGarment(gl, mesh, looks[g], anisotropy));
   const solid = createOccluders(gl, occluders);
   const light = lightMatrix();
   let shadowStale = true;
 
-  /** Copy the current shape of `changed` garments to the GPU. */
+  /** Recompute the drawn surface of `changed` garments and copy it to the GPU. */
   function update(world, changed) {
     changed.forEach((g) => {
       const garment = garments[g];
-      const offset = world.offsets[g];
-      vertexNormals(world.pos, offset, garment.mesh.tris, garment.normals);
-      cavity(world.pos, offset, garment.neighbours, garment.shading);
+      garment.smooth.evaluate(world.pos, world.offsets[g], garment.positions);
+      vertexNormals(garment.positions, 0, garment.smooth.tris, garment.normals);
+      cavity(garment.positions, 0, garment.neighbours, garment.shading, { crease: FINE_CREASE });
       gl.bindBuffer(gl.ARRAY_BUFFER, garment.position);
-      gl.bufferSubData(gl.ARRAY_BUFFER, 0, world.pos.subarray(3 * offset, 3 * (offset + world.counts[g])));
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, garment.positions);
       gl.bindBuffer(gl.ARRAY_BUFFER, garment.normal);
       gl.bufferSubData(gl.ARRAY_BUFFER, 0, garment.normals);
       gl.bindBuffer(gl.ARRAY_BUFFER, garment.cavity);
@@ -330,6 +382,7 @@ export function createRenderer(gl, { meshes, images, sheens, occluders }) {
     gl.uniformMatrix4fv(cloth.uniforms.uLight, false, light);
     gl.uniform1i(cloth.uniforms.uShadow, 1);
     gl.uniform1i(cloth.uniforms.uTex, 0);
+    gl.uniform1i(cloth.uniforms.uRelief, 2);
     gl.uniform1f(cloth.uniforms.uTexel, 1.5 / SHADOW_SIZE);
     gl.uniform3fv(cloth.uniforms.uEye, eye);
     gl.uniform3fv(cloth.uniforms.uLightDir, LIGHT_DIR);
@@ -338,6 +391,11 @@ export function createRenderer(gl, { meshes, images, sheens, occluders }) {
     gl.activeTexture(gl.TEXTURE0);
     garments.forEach((garment) => {
       gl.uniform1f(cloth.uniforms.uSheen, garment.sheen);
+      gl.uniform1f(cloth.uniforms.uBump, garment.bump);
+      gl.uniform2fv(cloth.uniforms.uReliefTexel, garment.reliefTexel);
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, garment.relief);
+      gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, garment.texture);
       gl.bindVertexArray(garment.vao);
       gl.drawElements(gl.TRIANGLES, garment.count, gl.UNSIGNED_SHORT, 0);

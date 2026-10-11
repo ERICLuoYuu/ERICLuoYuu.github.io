@@ -16,6 +16,7 @@ import { pick } from './pick.js';
 import { bookCoverage } from './coverage.js';
 import { createHand, asideTarget, dropAt } from './hand.js';
 import { createRenderer } from './render.js';
+import { floorPixelsPerUnit, textureScale } from './budget.js';
 import { boxColliders, occluderQuads } from '../scene/solids.js';
 import { CONTENTS } from '../scene/geometry.js';
 import { cameraMatrix, projectPoint, screenRay } from '../scene/projection.js';
@@ -66,6 +67,29 @@ async function loadImage(src) {
   return image;
 }
 
+/** A garment's relief map, or null (it is then drawn as plain fabric) when it has none or it fails to load. */
+async function loadRelief({ id, relief }) {
+  if (!relief) return null;
+  try {
+    return await loadImage(relief);
+  } catch (err) {
+    console.warn(`[parcel] The ${id}'s relief (${relief}) could not be loaded; it is drawn without it.`, err);
+    return null;
+  }
+}
+
+/** The image redrawn at `scale` of its size, or the image itself when that would hardly differ. */
+function resized(image, scale) {
+  if (!image || scale > 0.95) return image;
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const context = canvas.getContext('2d');
+  context.imageSmoothingQuality = 'high';
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
 /** Opacity of a garment texture at (u, v), from a quarter-size copy of its alpha channel. */
 function alphaSampler(image) {
   const width = Math.max(1, Math.round(image.naturalWidth / 4));
@@ -92,8 +116,11 @@ async function loadAssets() {
   pile.garments.forEach((g, i) => {
     if (g.positions.length !== 3 * meshes[i].count) throw new Error(`pile.json: ${g.id} has the wrong number of positions`);
   });
-  const images = await Promise.all(data.garments.map((g) => loadImage(g.texture)));
-  return { data, pile, meshes, images };
+  const [images, reliefs] = await Promise.all([
+    Promise.all(data.garments.map((g) => loadImage(g.texture))),
+    Promise.all(data.garments.map(loadRelief)),
+  ]);
+  return { data, pile, meshes, images, reliefs };
 }
 
 /**
@@ -117,7 +144,9 @@ export async function createClothes({ canvas, camera, reducedMotion = () => fals
 }
 
 function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
-  const { data, pile, meshes, images } = assets;
+  const {
+    data, pile, meshes, images, reliefs,
+  } = assets;
   const colliders = boxColliders();
   const world = createWorld({
     garments: meshes.map((mesh, g) => ({ mesh, material: data.garments[g].material })),
@@ -126,8 +155,19 @@ function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
     thickness: pile.thickness,
   });
   const alphaAt = images.map(alphaSampler);
-  const sheens = data.garments.map((g) => g.material.sheen ?? 0.3);
-  const makeRenderer = () => createRenderer(gl, { meshes, images, sheens, occluders: occluderQuads() });
+  // Upload only the resolution this screen can show (picking keeps the full-size alpha).
+  const need = floorPixelsPerUnit(innerWidth, innerHeight, Math.min(devicePixelRatio || 1, 2));
+  const looks = data.garments.map((g, i) => {
+    const scale = textureScale(g.pxPerUnit ?? data.pxPerUnit, need);
+    return {
+      image: resized(images[i], scale),
+      relief: resized(reliefs[i], scale),
+      reliefTexel: reliefs[i] ? [1 / reliefs[i].naturalWidth, 1 / reliefs[i].naturalHeight] : [0, 0],
+      sheen: g.material.sheen ?? 0.3,
+      bump: g.material.bump ?? 0,
+    };
+  });
+  const makeRenderer = () => createRenderer(gl, { meshes, looks, occluders: occluderQuads() });
   let renderer = makeRenderer();
   const all = data.garments.map((_, g) => g);
   const stale = new Set(all); // garments whose shape the GPU has not seen yet
