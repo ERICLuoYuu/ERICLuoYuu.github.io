@@ -57,5 +57,7 @@ test('works from a sub-folder, as on a GitHub Pages project site', async ({ page
   expect(await page.evaluate(() => window.__parcel.state)).toBe('sealed');
   const front = await page.$eval('.parcel', (el) => el.style.getPropertyValue('--art-box-front'));
   expect(front).toContain('/some-repo/assets/art/box-front.svg');
+  expect((await page.evaluate(() => window.__parcel.clothes())).enabled, 'the clothes load too').toBe(true);
   expect(problems).toEqual([]);
+  await page.unrouteAll({ behavior: 'ignoreErrors' }); // late requests (textures) may still be on their way
 });
