@@ -4,9 +4,16 @@ A static, hand-made "parcel" personal site for GitHub Pages. Visitors cut the
 tape on a box, peer into the dark, look down into it, move a pile of clothes
 aside, and read the small instruction booklet underneath.
 
-The clothes pile, the photo print, the desiccant packet and the manual-style
-booklet are specified in
-`docs/superpowers/specs/2026-10-11-clothes-pile-design.md`.
+The clothes pile, the desiccant packet and the manual-style booklet are
+specified in `docs/superpowers/specs/2026-10-11-clothes-pile-design.md`; the
+vacuum pack, the books and the detailed garments in
+`docs/superpowers/specs/2026-10-11-pack-and-garments-design.md`.
+
+On the box floor: the owner's vacuum pack along the left wall, the full depth
+of the box (a film body in the cloth simulation); the booklet in the upper
+right under the pile of clothes; four books in the lower right (the manga on
+the dictionary), each a collider; and the desiccant packet on the floor in
+the front-right corner.
 
 ## Understanding (from the brief)
 
@@ -60,6 +67,8 @@ style each stage.
 | `js/scene/projection.js` | Pure: the CSS camera as matrices, screen rays | geometry |
 | `js/scene/solids.js` | Pure: walls, open flaps and floor props as colliders and occluders | geometry |
 | `js/cloth/mesh.js` | Pure: a garment's particles, stretch and bend constraints from its coverage grid | — |
+| `js/cloth/smooth.js` | Pure: four-point interpolation stencils — each cloth cell drawn as 2 × 2 quads | mesh |
+| `js/cloth/budget.js` | Pure: device px per unit at the overhead view; texture upload scale | geometry, projection |
 | `js/cloth/hash.js` | Pure: spatial hash for nearby particles (Ten Minute Physics, MIT) | — |
 | `js/cloth/collide.js` | Pure: plane, box and particle-pair contacts with Coulomb friction | — |
 | `js/cloth/solver.js` | Pure: XPBD steps, grips, sleeping and waking | mesh, hash, collide |
@@ -99,12 +108,12 @@ focusable `role="slider"`; holding → / Enter / Space advances the knife.
 A transparent WebGL2 canvas lies over the CSS-3D parcel. It builds its view
 and projection from the same camera values `camera.js` applies to the CSS
 (`projection.js`), so cloth and cardboard line up at every angle and size.
-The walls, open flaps, photo, desiccant and booklet are drawn into it
+The walls, open flaps, floor, booklet, books and desiccant are drawn into it
 depth-only (they occlude the cloth and catch its shadow tint, but show no
 colour), so the CSS stays the visible box.
 
-Each garment is a particle grid built from its picture's coverage (spacing
-10, thickness 7.5), solved with XPBD after Ten Minute Physics: stretch and
+Each garment is a particle grid built from its picture's coverage (cells of
+at most 6 units, thickness 4.5), solved with XPBD after Ten Minute Physics: stretch and
 bend constraints, particle-pair contacts via a spatial hash, and the box as
 oriented slabs. Friction is Coulomb (stick, then slide), except for the
 garment in the hand, which only smears over the cloth below so it cannot
@@ -113,17 +122,41 @@ that has barely moved for 0.4 s falls asleep and becomes solid ground; it
 wakes only when moving cloth pushes into it side-on or moves out from under
 it, so dragging over the pile disturbs nothing below.
 
+**Drawn finer than simulated.** A grid cell is cloth when any of it is
+opaque, and the outline is cut from the picture's alpha, so sleeves and
+collars keep their drawn shape; `core` cells (mostly opaque) are the only
+ones that count as hiding the booklet. Each cell is drawn as a 2 × 2 patch
+from the four-point scheme, which passes through every particle. A relief
+map per garment is lit in the shader through a tangent frame built from
+screen-space derivatives, so seams and pleats catch the same light as the
+folds. Textures are uploaded at the resolution the screen needs.
+
+**Scale.** Garments are drawn in pattern units and sized by a per-garment
+fit to the figure in the owner's pack (`tools/clothes/fit.py`); cloth cells
+are at most 6 units, the cloth 4.5 thick, 16 substeps a frame.
+
+**The pack is cloth too.** It is the last body (`kind: "film"`): four times
+as heavy per particle, very stiff, held by a wide patch (30 units) lifted 6.
+It is drawn after the garments, blended and without writing depth, so cloth
+beneath shows through its clear film; only its contents cast a shadow.
+Without WebGL2 the CSS pack (`.pack`) shows instead; with it, the CSS pack
+hides while the layer shows.
+
+**Holding.** The hand holds a fingertip's patch (8 units) 12 units above
+where the cloth would rest on what lies beneath, so a garment slides over
+the pile with its outline intact; gravity is −2400 units/s² with air drag
+1.2/s.
+
 The pile is settled once, offline, by `tools/build-pile.mjs` with the same
-solver, and loads asleep: nothing is simulated (or drawn) until a visitor
+solver (kept only if at least six garments' signature features show), and loads asleep: nothing is simulated (or drawn) until a visitor
 touches a garment. Rendering is on demand, with a 2048² shadow map redrawn
 only while cloth moves. Without WebGL2 or the data, the layer is a no-op and
 the booklet opens straight away.
 
-The hand holds a garment 45 units above what lies beneath and rises over the
-rim at once. Let go beyond the rim, the hand carries on past the open flap,
+The hand rises over the rim at once. Let go beyond the rim, the hand carries on past the open flap,
 so the garment lands on the table instead of sliding back into the box.
 Keyboard moves follow the same path to beyond the nearer of the right and
-front flaps (never over the photo or up the steep back flap).
+front flaps (never over the pack or up the steep back flap).
 
 **Booklet lock.** Each time the cloth comes to rest, `bookCoverage` samples
 the booklet's top and `isBookUncovered` decides (with hysteresis) whether it
@@ -166,3 +199,5 @@ hard-cover opening, then hands over to the flipbook at identical geometry.
   and second pointers; restart and resize mid-drag; no WebGL; mute/restart;
   page turns (click, drag, keys); reduced motion; asset loading with a
   missing asset.
+- Python (pytest): the pack matte and relief, the pack body, garment fit and
+  canvas, book covers, record merging.

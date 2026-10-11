@@ -85,10 +85,10 @@ crisp on high-density screens). SVG, PNG, JPG and WebP all work.
 | `flapLong` | 420 × 150 | the two long top flaps, outside | the tape runs along the 150 px edge |
 | `flapShort` | 300 × 150 | the two short top flaps, outside | mostly hidden under the long flaps |
 | `boxInside` | 420 × 220 | inner walls and the underside of every flap | seen in the dark and overhead views |
-| `boxFloor` | 420 × 300 | the floor inside the box | the photo and book lie on it |
+| `boxFloor` | 420 × 300 | the floor inside the box | the pack, the booklet and the books lie on it |
 | `bookCover` | 360 × 500 | the booklet's cover (in the box and when it flies out) | leave the top ~30 % calm: the title is written there |
 | `endpaper` | 360 × 500 | inside of the cover, first left page | the owner label sits at the bottom |
-| `desiccant` | 42 × 60 | the silica-gel packet in the front-right corner of the floor | redrawn without any maker's name (`python tools/generate_props.py`) |
+| `desiccant` | 24 × 34 | the silica-gel packet in the front-right corner of the floor | redrawn without any maker's name (`python tools/generate_props.py`) |
 | `questionMark` | about 200 × 280 | the glowing question mark | **transparent background**; light colours glow best |
 | `instruction` | any | optional image of your handwritten instruction | transparent background; replaces the typed text |
 
@@ -100,25 +100,38 @@ edges or a spine, ask and they can become layers too.
 If a path is wrong or a file is missing, the site falls back to the built-in
 art for that layer and the console says which file it could not find.
 
-### 4. Your photo — `assets/photo/` + `content/site.js` → `photo`
+### 4. Your vacuum pack — `assets/photo/` + `content/site.js` → `photo`
 
-It lies as a glossy print on the left of the box floor. A portrait about
-0.62 : 1 fits the print; for a picture on a plain white background,
+Your artwork lies in the box as a vacuum-sealed pack along the left wall, the
+full depth of the box. Visitors can pick it up anywhere and move it: it is
+heavy and stiff, flexes a little and settles flat. `tools/prepare_pack.py`
+cuts it out of its white canvas and keeps the plastic see-through:
 
-```bash
-python tools/prepare_photo.py <your image> assets/photo/my-photo.webp
-```
+    python tools/prepare_pack.py F:/CXY.png assets/photo --solid 950,1200,44,40
+    npm run clothes
 
-trims the white away and saves a web-sized copy. Then point `photo.src` at
-it. `photo.alt` describes it for screen-reader users — the current text is a
-draft for you to check and reword. Optionally add `text.photoCaption` for a
-handwritten caption under it.
+- Everything coloured or dark inside the pack stays solid; `--solid x,y,rx,ry`
+  (in the artwork's pixels) marks pale solids the colour test misses — here
+  the white sandal on the left foot.
+- `--film 0.45` sets how see-through the clear plastic is (lower shows more
+  of what lies beneath). Laid back over white, the result always equals your
+  artwork; the tool refuses to write if it would not.
+- An image that already has transparency is used as it is.
+- It writes `vacuum-pack.webp`, `vacuum-pack-relief.webp` (where the contents
+  bulge the plastic, lit by the box's lamp) and `vacuum-pack-shade.webp` (the
+  same light and shade, for browsers without WebGL2, which show a still pack).
+  `npm run clothes` then rebuilds the pack's cloth body
+  (`tools/pack_body.py`). The pack is 181 × 290 units (`CONTENTS.pack` in
+  `js/scene/geometry.js`); a new picture should keep the 0.62 aspect.
+
+`photo.alt` describes it for screen-reader users — the current text is a
+draft for you to check and reword.
 
 ### 5. Your handwriting
 
 Either point `handwriting.font` at a handwriting font made from your own
 writing (for example with a free font-from-handwriting service), and every
-handwritten line on screen — the instruction, the hints, the photo caption —
+handwritten line on screen — the instruction and the hints —
 uses it, or keep the bundled Caveat font. (The booklet itself is typeset,
 like a real manual.)
 For single pieces (the instruction, the question mark) use images, above.
@@ -140,25 +153,37 @@ keyboard, Tab reaches a "Move the … aside" button for each garment. The
 booklet opens once most of its cover is uncovered; the rule is
 `isBookUncovered` in `js/cloth/coverage.js`.
 
-The garments are drawn by `tools/generate_clothes.py`. To change one — its
-colour, pattern or cut — edit its drawing there and run
+`npm run clothes` redraws the garments (`tools/generate_clothes.py`, with the
+drawing code in `tools/clothes/`: `canvas.py`, `fabrics.py`, `details.py`,
+`motifs.py`, `traditional.py`, `modern.py`, and `fit.py`, which sizes every
+garment to the figure in your pack), adds the pack's body and settles the
+pile (`tools/build-pile.mjs`). Each garment is a colour picture with no
+painted shading plus a relief map (seams, hems, piping, closures, weave)
+that the site lights with the box's lamp. `--only qipao,blouse` redraws just
+those. The pile is kept only if it hides the booklet, spares the pack and
+shows at least six garments' signature features. `npm run test:py` tests the
+Python tools; `node tools/shots.mjs` takes overhead screenshots into `shots/`.
+The Python tools need Pillow, NumPy and SciPy (and pytest for the tests).
 
-```bash
-npm run clothes      # needs Python with Pillow and NumPy
-```
-
-which redraws the pictures, rebuilds each garment's cloth and settles a fresh
-pile offline (`assets/clothes/pile.json`), so every visit starts from the
-same heap. The `label` in `assets/clothes/garments.json` is what screen
+The `label` in `assets/clothes/garments.json` is what screen
 readers and the keyboard buttons call each garment.
 
 Browsers without WebGL 2 skip the clothes; the booklet is then free to open.
 
+### 8. Your books — `content/site.js` → `books`
+
+Four books lie in the lower right: *Hunter × Hunter*, a German-Chinese
+dictionary, *One Hundred Years of Solitude* (Gabriel García Márquez) and
+*Siddhartha* (Hermann Hesse). `npm run books` (`tools/generate_books.py`)
+draws their covers in the site's own fonts — titles only, no publisher
+marks. Their places and sizes are `BOOKS` in `js/scene/geometry.js`; each
+book's `alt` text in `content/site.js` is what screen readers say.
+
 ### Still needed from you
 
 - [ ] The booklet text in `content/book.md`, the cover title (`bookTitle`) and `ownerName`
-- [ ] Check and reword the photo's `alt` description
-- [ ] Artwork: `questionMark` (and optionally `instruction`) — the box, booklet, photo and desiccant are done
+- [ ] Check and reword the pack's `alt` description (`photo.alt`)
+- [ ] Artwork: `questionMark` (and optionally `instruction`) — the box, booklet, pack, books and desiccant are done
 - [ ] Your handwriting (font or images), if you want it instead of Caveat
 - [ ] The site title and description (`meta` in `content/site.js`)
 
@@ -168,7 +193,7 @@ Browsers without WebGL 2 skip the clothes; the booklet is then free to open.
 | --- | --- |
 | stages and transitions (sealed → cutting → dark → overhead → book) | `js/core/state-machine.js`, `js/flow.js` |
 | the 3D parcel and camera | `js/scene/*`, `css/scene.css` |
-| the clothes: cloth physics, WebGL drawing with shadows, dragging, keyboard moves, the booklet lock | `js/cloth/*` |
+| the clothes and the pack: cloth physics (the pack a heavy, stiff film body), a smooth surface drawn finer than simulated, relief maps lit by the box's lamp, textures at the screen's resolution, shadows, dragging, keyboard moves, the booklet lock | `js/cloth/*` |
 | cutting (mouse, touch, keyboard) and the traced slit | `js/tape/*` |
 | the book: pagination, page turning, the flying cover | `js/book/*`, `css/book.css` |
 | sound, preloading, controls | `js/audio/sound.js`, `js/loader/preload.js`, `js/ui/controls.js` |
@@ -187,6 +212,7 @@ trackpads.
 ```bash
 npm install                       # once, installs Playwright (uses your installed Chrome)
 npm test                          # unit tests for the pure logic
+npm run test:py                   # the Python tools (needs pytest)
 npm run test:e2e                  # full journeys in Chrome: mouse, touch, keyboard, reduced motion
 ```
 
@@ -206,3 +232,4 @@ Regenerate the built-in box art, placeholders, textures and sounds with `npm run
 - Cloth simulation: after Matthias Müller's [Ten Minute Physics](https://matthias-research.github.io/pages/) cloth demos, MIT (notice in `js/cloth/hash.js`).
 - Box art, placeholder art, textures and sounds: generated by `tools/generate_placeholders.py`.
 - Clothes, booklet drawings, the desiccant packet and the hand cursors: generated by `tools/generate_clothes.py`, `tools/generate_manual.py`, `tools/generate_props.py` and `tools/generate_cursors.py`.
+- The pack: the owner's artwork, cut out by `tools/prepare_pack.py`. Book covers: drawn by `tools/generate_books.py` in the bundled Noto Sans (SIL OFL).
