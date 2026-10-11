@@ -49,6 +49,7 @@ function collectEdges(triangles) {
 /**
  * @param {{id:string, size:[number, number], grid:{cols:number, rows:number, cells:string, core?:string}}} garment
  * @returns {{count:number, rest:Float32Array, uv:Float32Array, tris:Uint32Array, core:Uint8Array,
+ *            lattice:{cols:number, rows:number, at:Int32Array, cells:string},
  *            stretch:{a:number,b:number,rest:number}[], bend:{a:number,b:number,rest:number}[]}}
  */
 export function buildMesh(garment) {
@@ -92,7 +93,11 @@ export function buildMesh(garment) {
     .filter(({ opposite }) => opposite.length === 2)
     .map(({ opposite: [a, b] }) => ({ a, b, rest: length(a, b) }));
 
+  const lattice = new Int32Array((cols + 1) * (rows + 1)).fill(-1);
+  index.forEach((v, key) => { lattice[key] = v; });
+
   return Object.freeze({
     count: corners.length, rest, uv, tris: new Uint32Array(triangles.flat()), core, stretch, bend,
+    lattice: Object.freeze({ cols, rows, at: lattice, cells }),
   });
 }

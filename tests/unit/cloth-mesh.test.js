@@ -71,3 +71,17 @@ test('a core cell outside the covered cells is refused', () => {
     /grid\.core/,
   );
 });
+
+test('the lattice maps every grid corner to its particle, or −1', () => {
+  const m = buildMesh(garment('10' + '01', 2, 2));
+  const { cols, rows, at } = m.lattice;
+  assert.equal(at.length, (cols + 1) * (rows + 1));
+  for (let j = 0; j <= rows; j += 1) {
+    for (let i = 0; i <= cols; i += 1) {
+      const v = at[j * (cols + 1) + i];
+      if (v < 0) continue;
+      assert.deepEqual([m.rest[3 * v], m.rest[3 * v + 1]], [i * 10, j * 10]);
+    }
+  }
+  assert.equal(at[2], -1, 'corner (2, 0) touches no covered cell');
+});
