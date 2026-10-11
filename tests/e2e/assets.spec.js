@@ -16,6 +16,20 @@ test('essential artwork, fonts and sounds load cleanly', async ({ page }) => {
   expect(problems).toEqual([]);
 });
 
+test('the owner photo and the desiccant packet lie on the box floor', async ({ page }) => {
+  const problems = await openSite(page, '?jump=overhead');
+  await waitForState(page, 'overhead');
+  const photo = await page.$eval('.photo-img', (img) => ({ src: img.currentSrc, ok: img.complete && img.naturalWidth > 0 }));
+  expect(photo.src).toContain('assets/photo/vacuum-collage.webp');
+  expect(photo.ok).toBe(true);
+  const packet = await page.$eval('.desiccant', (img) => ({ src: img.currentSrc, ok: img.complete && img.naturalWidth > 0 }));
+  expect(packet.src).toContain('assets/art/desiccant.webp');
+  expect(packet.ok).toBe(true);
+  const [photoBox, bookBox] = await Promise.all([page.locator('.photo-card').boundingBox(), page.locator('.book3d').boundingBox()]);
+  expect(photoBox.x + photoBox.width).toBeLessThan(bookBox.x + 4); // the print lies to the left of the booklet
+  expect(problems).toEqual([]);
+});
+
 test('a missing artwork file falls back to the built-in art', async ({ page }) => {
   await page.route('**/content/site.js', async (route) => {
     const original = await (await route.fetch()).text();

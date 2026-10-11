@@ -53,7 +53,7 @@ function buildFlap(side) {
 
 function buildPhoto(text) {
   const { x, y, width, height, rotate } = CONTENTS.photo;
-  const card = h('figure', 'photo-card');
+  const card = h('figure', 'photo-card print');
   card.style.cssText = `left:${x}px;top:${y}px;width:${width}px;height:${height}px;--rot:${rotate}deg`;
   const frame = h('div', 'photo-frame inside');
   const img = h('img', 'photo-img', { alt: '', draggable: 'false' });
@@ -62,6 +62,14 @@ function buildPhoto(text) {
   frame.append(img, caption, h('span', 'washi', { 'aria-hidden': 'true' }));
   card.append(frame);
   return { el: card, img };
+}
+
+/** The silica-gel packet: a small static prop the clothes can rest against. */
+function buildDesiccant() {
+  const { x, y, width, height, rotate } = CONTENTS.desiccant;
+  const img = h('img', 'desiccant', { alt: '', draggable: 'false' });
+  img.style.cssText = `left:${x}px;top:${y}px;width:${width}px;height:${height}px;--rot:${rotate}deg`;
+  return img;
 }
 
 function buildBook(text) {
@@ -109,8 +117,9 @@ export function buildParcel(container, { text }) {
 
   const photo = buildPhoto(text);
   const book = buildBook(text);
+  const desiccant = buildDesiccant();
   const contents = h('div', 'contents');
-  contents.append(photo.el, book.el);
+  contents.append(photo.el, desiccant, book.el);
 
   const flaps = {};
   const tapeSvgs = {};
@@ -140,7 +149,7 @@ export function buildParcel(container, { text }) {
   );
   container.append(parcel);
 
-  return { parcel, flaps, tapeSvgs, tapeProbes, question, questionImg: glyphImg, book, photo };
+  return { parcel, flaps, tapeSvgs, tapeProbes, question, questionImg: glyphImg, book, photo, desiccant };
 }
 
 /** Centre of an element's on-screen box (works for transformed 1px probes). */

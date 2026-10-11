@@ -62,13 +62,15 @@ export default {
     bookCover: 'assets/placeholders/book-cover.svg', // 360 × 500 — front cover of the little book
     endpaper: 'assets/placeholders/endpaper.svg', // 360 × 500 — inside of the cover
     questionMark: 'assets/placeholders/question-mark.svg', // ~200 × 280, transparent background
+    desiccant: 'assets/art/desiccant.webp', // 42 × 60 — the silica-gel packet in the front-right corner
     instruction: '', // optional: a transparent image of your handwritten instruction
   },
 
-  /** Your picture, shown as a photo card inside the box. */
+  /** Your picture, shown as a glossy print on the left of the box floor. */
   photo: {
-    src: 'assets/placeholders/photo.svg', // portrait, about 4 : 5
-    alt: '[Describe your photo for screen-reader users]',
+    src: 'assets/photo/vacuum-collage.webp', // portrait, about 0.62 : 1 (tools/prepare_photo.py crops and resizes)
+    // A plain description of what is visible. Reword it in your own voice, then remove "[Draft — check this]".
+    alt: '[Draft — check this] A collage: a person in a red top and blue floral skirt lies under crinkled clear plastic, as if vacuum-packed, surrounded by sushi, fries, strawberries, a fruit-and-yogurt bowl and dumplings.',
   },
 
   /**

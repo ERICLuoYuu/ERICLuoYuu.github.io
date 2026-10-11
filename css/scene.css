@@ -181,6 +181,26 @@ body[data-state="dark"] .floor-glow { opacity: 1; }
   background: #dfe5ea;
   filter: sepia(.12) saturate(.95);
 }
+.photo-card.print .photo-frame {
+  padding: 4px;
+  border-radius: 1px;
+  background: #fdfdfb;
+  box-shadow: 2px 5px 9px rgba(30, 18, 8, .38), 0 0 0 .5px rgba(60, 40, 20, .18);
+}
+.photo-card.print .photo-img { filter: none; background: #fff; }
+.photo-card.print .photo-frame::before {
+  /* a soft gloss across the print */
+  content: ''; position: absolute; inset: 4px;
+  background: linear-gradient(118deg, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, .22) 46%, rgba(255, 255, 255, 0) 60%);
+  pointer-events: none;
+}
+.desiccant {
+  position: absolute;
+  transform: translateZ(1.2px) rotate(var(--rot));
+  /* darkens with the rest of the interior until the light comes on */
+  filter: drop-shadow(1px 2px 1.5px rgba(30, 18, 8, .38)) brightness(calc(1 - (1 - var(--light, 1)) * .95));
+  pointer-events: none;
+}
 .photo-caption {
   position: absolute; left: 6px; right: 6px; bottom: 5px;
   font-size: 18px; line-height: 1; text-align: center;

@@ -28,6 +28,7 @@ const FALLBACK = {
   bookCover: 'assets/placeholders/book-cover.svg',
   endpaper: 'assets/placeholders/endpaper.svg',
   questionMark: 'assets/placeholders/question-mark.svg',
+  desiccant: 'assets/art/desiccant.webp',
   photo: 'assets/placeholders/photo.svg',
 };
 
@@ -256,6 +257,7 @@ async function start() {
   scene.photo.img.src = resolved.photo;
   scene.photo.img.alt = config.photo.alt;
   scene.questionImg.src = resolved.questionMark;
+  scene.desiccant.src = resolved.desiccant;
   app.resetInstruction();
   reportPlaceholders(config, resolved, bookView);
 

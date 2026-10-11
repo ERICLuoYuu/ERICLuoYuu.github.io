@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BOX, frameFor, tapeCorners, rimMagnification } from '../../js/scene/geometry.js';
+import { BOX, CONTENTS, frameFor, tapeCorners, rimMagnification } from '../../js/scene/geometry.js';
 
 const screens = [
   { width: 1440, height: 900 }, { width: 1024, height: 768 }, { width: 390, height: 844 },
@@ -40,4 +40,26 @@ test('tape corners run along the seam on top of the closed box', () => {
 
 test('unknown views throw', () => {
   assert.throws(() => frameFor('sideways', 800, 600));
+});
+
+/** Axis-aligned bounds of a rotated rectangle lying on the floor. */
+const footprint = ({ x, y, width, height, rotate }) => {
+  const a = (rotate * Math.PI) / 180;
+  const hx = Math.abs((width / 2) * Math.cos(a)) + Math.abs((height / 2) * Math.sin(a));
+  const hy = Math.abs((width / 2) * Math.sin(a)) + Math.abs((height / 2) * Math.cos(a));
+  const cx = x + width / 2;
+  const cy = y + height / 2;
+  return { left: cx - hx, right: cx + hx, top: cy - hy, bottom: cy + hy };
+};
+
+test('photo, booklet and desiccant lie inside the walls without overlapping', () => {
+  const inner = { left: 2, right: BOX.width - 2, top: 2, bottom: BOX.depth - 2 };
+  const [photo, book, desiccant] = ['photo', 'book', 'desiccant'].map((k) => footprint(CONTENTS[k]));
+  [photo, book, desiccant].forEach((b) => {
+    assert.ok(b.left >= inner.left && b.right <= inner.right, 'inside the side walls');
+    assert.ok(b.top >= inner.top && b.bottom <= inner.bottom, 'inside the front and back walls');
+  });
+  assert.ok(photo.right < book.left, 'the photo stays clear of the booklet');
+  assert.ok(CONTENTS.photo.x + CONTENTS.photo.width / 2 < BOX.width / 2, 'the photo is on the left');
+  assert.ok(desiccant.left > BOX.width * 0.75 && desiccant.top > BOX.depth * 0.6, 'the desiccant sits in the front-right corner');
 });

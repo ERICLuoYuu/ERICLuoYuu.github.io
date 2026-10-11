@@ -17,8 +17,9 @@ export const BOX = Object.freeze({
 
 /** Things lying on the floor of the box, in floor coordinates. */
 export const CONTENTS = Object.freeze({
-  photo: Object.freeze({ x: 34, y: 58, width: 148, height: 184, rotate: -7 }),
-  book: Object.freeze({ x: 220, y: 36, width: 164, height: 228, thickness: 20, rotate: 4 }),
+  photo: Object.freeze({ x: 24, y: 34, width: 148, height: 230, rotate: -6 }),
+  book: Object.freeze({ x: 198, y: 28, width: 164, height: 228, thickness: 8, rotate: 4 }),
+  desiccant: Object.freeze({ x: 368, y: 232, width: 42, height: 60, thickness: 3, rotate: -12 }),
 });
 
 /** Camera angles (degrees) and interior light for each view. */
