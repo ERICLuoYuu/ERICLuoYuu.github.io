@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { openSite, stateOf, bookOf, waitForState, mouseCutAll } from './helpers.js';
+import { openSite, stateOf, bookOf, waitForState, mouseCutAll, clearClothes } from './helpers.js';
 
 test.describe('the whole parcel, start to finish', () => {
   test.skip(({ isMobile }) => isMobile, 'desktop journey');
@@ -17,6 +17,7 @@ test.describe('the whole parcel, start to finish', () => {
     expect(Number(light)).toBeCloseTo(1, 2);
     await expect(page.locator('.photo-card')).toBeVisible();
 
+    await clearClothes(page);
     const bookCursor = await page.$eval('.book-top', (el) => getComputedStyle(el).cursor);
     expect(bookCursor).toContain('hand.svg');
 
@@ -106,6 +107,7 @@ test.describe('phone', () => {
 
   test('the book shows one readable page at a time', async ({ page }) => {
     await openSite(page, '?jump=overhead');
+    await clearClothes(page);
     await page.tap('.book-top');
     await waitForState(page, 'reading', 15_000);
     const status = await bookOf(page);

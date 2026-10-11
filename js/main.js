@@ -17,6 +17,7 @@ import { createFlyer } from './book/flyer.js';
 import { createControls } from './ui/controls.js';
 import { createFlow } from './flow.js';
 import { createClothes } from './cloth/layer.js';
+import { createClothesInput } from './cloth/interaction.js';
 
 /** Built-in art used whenever a configured file cannot be loaded. */
 const FALLBACK = {
@@ -57,6 +58,10 @@ function applyRootStyles(config) {
   root.setProperty('--cursor-knife', `${cssUrl(cursors.knife)} 3 29, ${cssUrl(cursors.knifeFallback)} 3 29, crosshair`);
   root.setProperty('--cursor-knife-pressed', `${cssUrl(cursors.knifePressed)} 3 29, ${cssUrl(cursors.knifeFallback)} 3 29, crosshair`);
   root.setProperty('--cursor-hand', `${cssUrl(cursors.hand)} 11 2, ${cssUrl(cursors.handFallback)} 11 2, pointer`);
+  if (cursors.grab) root.setProperty('--cursor-grab', `${cssUrl(cursors.grab)} 16 16, ${cssUrl(cursors.grabFallback ?? cursors.grab)} 16 16, grab`);
+  if (cursors.grabbing) {
+    root.setProperty('--cursor-grabbing', `${cssUrl(cursors.grabbing)} 16 16, ${cssUrl(cursors.grabbingFallback ?? cursors.grabbing)} 16 16, grabbing`);
+  }
   root.setProperty('--tex-paper', cssUrl(textures.paper));
   root.setProperty('--tex-grain', cssUrl(textures.grain));
 }
@@ -160,10 +165,14 @@ function wireReader(app, flow) {
 const CLOTHES_VISIBLE = new Set(['overhead', 'lifting', 'reading', 'closing']);
 const CLOTHES_REVEAL_DELAY = 600;
 
-function wireClothes({ machine, clothes }) {
+function wireClothes({ machine, clothes, dom }) {
+  const input = clothes.enabled
+    ? createClothesInput({ stage: dom.stage, clothes, canInteract: () => machine.state === 'overhead' })
+    : { cancel() {} };
   let timer = 0;
   machine.subscribe((to) => {
     clearTimeout(timer);
+    if (to !== 'overhead') input.cancel();
     if (to === 'revealing') {
       timer = setTimeout(() => clothes.show(true), prefersReducedMotion() ? 0 : CLOTHES_REVEAL_DELAY);
       return;
@@ -298,6 +307,7 @@ async function start() {
     sound: () => sound.status(),
     book: () => bookView.status(),
     clothes: () => app.clothes.status(),
+    clearClothes: () => app.clothes.clearAside(),
     project: (point) => app.clothes.project(point),
   };
 }

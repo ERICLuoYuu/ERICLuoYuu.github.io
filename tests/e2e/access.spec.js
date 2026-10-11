@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import {
-  openSite, stateOf, progressOf, bookOf, waitForState, mouseCutAll,
+  openSite, stateOf, progressOf, bookOf, waitForState, mouseCutAll, clearClothes,
 } from './helpers.js';
 
 test.skip(({ isMobile }) => isMobile, 'keyboard and preference checks run on desktop');
@@ -60,6 +60,7 @@ test.describe('reduced motion', () => {
     await waitForState(page, 'dark');
     await page.click('.question');
     await waitForState(page, 'overhead');
+    await clearClothes(page);
     await page.click('.book-top');
     await waitForState(page, 'reading', 5000);
     await page.click('#reader-next');

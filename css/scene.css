@@ -333,8 +333,14 @@ body[data-state="dark"] .question-glyph { animation: question-pop .7s cubic-bezi
   .stage.is-cutting .parcel { cursor: var(--cursor-knife-pressed, crosshair) !important; }
   body[data-state="dark"] .question,
   body[data-state="overhead"] .book-top { cursor: var(--cursor-hand, pointer); }
+  /* js/cloth/interaction.js: an open hand over a garment, a closed one while carrying it */
+  .stage.over-garment, .stage.over-garment * { cursor: var(--cursor-grab, grab) !important; }
+  .stage.is-grabbing, .stage.is-grabbing * { cursor: var(--cursor-grabbing, grabbing) !important; }
 }
 body:not([data-state="overhead"]) .book-top { pointer-events: none; }
+/* Over or under a garment, the booklet must not lift as if the pointer were on it. */
+.stage.over-garment .book-top,
+.stage.is-grabbing .book-top { pointer-events: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .flap, .book3d, .book-shadow, .floor-glow { transition: none !important; }

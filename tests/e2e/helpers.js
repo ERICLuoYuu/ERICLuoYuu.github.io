@@ -15,6 +15,8 @@ export const stateOf = (page) => page.evaluate(() => window.__parcel.state);
 export const progressOf = (page) => page.evaluate(() => window.__parcel.progress());
 export const soundOf = (page) => page.evaluate(() => window.__parcel.sound());
 export const bookOf = (page) => page.evaluate(() => window.__parcel.book());
+/** Move every garment off the booklet (they lie on top of it until a visitor moves them). */
+export const clearClothes = (page) => page.evaluate(() => window.__parcel.clearClothes());
 
 export async function waitForState(page, state, timeout = 10_000) {
   await page.waitForFunction((s) => window.__parcel?.state === s, state, { timeout });

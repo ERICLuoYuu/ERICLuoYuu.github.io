@@ -92,6 +92,10 @@ export default {
     knifeFallback: 'assets/ui/knife.png',
     hand: 'assets/ui/hand.svg',
     handFallback: 'assets/ui/hand.png',
+    grab: 'assets/ui/hand-open.svg', // over a garment you can move
+    grabFallback: 'assets/ui/hand-open.png',
+    grabbing: 'assets/ui/hand-closed.svg', // while carrying it
+    grabbingFallback: 'assets/ui/hand-closed.png',
   },
 
   sounds: {
