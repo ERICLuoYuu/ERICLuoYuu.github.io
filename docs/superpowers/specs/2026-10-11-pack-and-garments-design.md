@@ -121,7 +121,7 @@ images:
   surface detail — seams and topstitching, hems, ribbing, pleat edges, piping,
   closures, lace, and a fine weave/knit grain. Lit at run time (section 3).
 
-Resolution 4 texture pixels per parcel unit (2.4 today), drawn 3× supersampled.
+Resolution 4 texture pixels per parcel unit (2.4 today), drawn 2× supersampled.
 The generator is split into small modules under `tools/clothes/` (canvas and
 relief layer, fabrics, construction details, one module per garment group); the
 entry point stays `tools/generate_clothes.py` / `npm run clothes`.
@@ -217,7 +217,7 @@ Unit (`node --test`):
 - `clothes-data.test.js`: every garment has colour, relief and signature; the
   relief image matches the colour image's size; grids derive from alpha.
 
-Python (`python -m unittest`, no extra test dependencies):
+Python (pytest, `npm run test:py`):
 - `prepare_pack.py`: the canvas becomes transparent; solids are opaque; film
   alpha stays in range; recomposited over white it matches the input; a
   borderless input is refused.
