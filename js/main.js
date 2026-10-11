@@ -16,6 +16,7 @@ import { createBookView } from './book/book-view.js';
 import { createFlyer } from './book/flyer.js';
 import { createControls } from './ui/controls.js';
 import { createFlow } from './flow.js';
+import { createClothes } from './cloth/layer.js';
 
 /** Built-in art used whenever a configured file cannot be loaded. */
 const FALLBACK = {
@@ -155,6 +156,23 @@ function wireReader(app, flow) {
   });
 }
 
+/** States in which the clothes are in view; during the reveal they fade in once the light starts to rise. */
+const CLOTHES_VISIBLE = new Set(['overhead', 'lifting', 'reading', 'closing']);
+const CLOTHES_REVEAL_DELAY = 600;
+
+function wireClothes({ machine, clothes }) {
+  let timer = 0;
+  machine.subscribe((to) => {
+    clearTimeout(timer);
+    if (to === 'revealing') {
+      timer = setTimeout(() => clothes.show(true), prefersReducedMotion() ? 0 : CLOTHES_REVEAL_DELAY);
+      return;
+    }
+    clothes.show(CLOTHES_VISIBLE.has(to));
+    if (to === 'sealed') clothes.reset();
+  });
+}
+
 function wireResize(app, flow) {
   let frame = 0;
   let timer = 0;
@@ -244,11 +262,17 @@ async function start() {
   });
 
   const progressBar = $('loader-progress');
+  const clothesTask = createClothes({ canvas: $('clothes'), camera }); // always resolves, disabled if it must
   resolved = await preload({
     images: imagePlan(config),
-    tasks: [fontsTask(), loadHandwritingFont(config.handwriting.font), bookView.load(config.book.source), ...sound.prefetch()],
+    tasks: [
+      fontsTask(), loadHandwritingFont(config.handwriting.font), bookView.load(config.book.source), clothesTask,
+      ...sound.prefetch(),
+    ],
     onProgress: (f) => { progressBar.style.transform = `scaleX(${f.toFixed(3)})`; },
   });
+  app.clothes = await clothesTask;
+  wireClothes(app);
   if (config.handwriting.font) document.documentElement.classList.add('owner-hand');
 
   applyArt(scene.parcel, { ...config.art, ...resolved }, { grain: resolved.grain });
@@ -273,6 +297,8 @@ async function start() {
     progress: () => app.cutting.progress(),
     sound: () => sound.status(),
     book: () => bookView.status(),
+    clothes: () => app.clothes.status(),
+    project: (point) => app.clothes.project(point),
   };
 }
 

@@ -22,6 +22,18 @@ body.reader-open .stage { filter: blur(3px) brightness(.7) saturate(.85); }
   transform-style: preserve-3d;
 }
 
+/* The clothes, drawn by WebGL in the same camera as the CSS box (js/cloth/layer.js).
+   Pointer input goes to the stage underneath; the layer only draws. It is never
+   faded: half-transparent clothes would show the booklet through them. They
+   brighten with the interior light instead, in the shader. */
+.clothes-layer {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  visibility: hidden;
+}
+.clothes-layer.is-visible { visibility: visible; }
+
 .parcel {
   position: absolute;
   left: calc(var(--W) * -.5px); top: calc(var(--D) * -.5px);
