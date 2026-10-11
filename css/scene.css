@@ -195,7 +195,7 @@ body[data-state="dark"] .floor-glow { opacity: 1; }
 .pack-img, .pack-shade { position: absolute; inset: 0; width: 100%; height: 100%; }
 .desiccant {
   position: absolute;
-  transform: translateZ(1.2px) rotate(var(--rot));
+  transform: translateZ(calc(var(--base, 0px) + 1.2px)) rotate(var(--rot));
   /* darkens with the rest of the interior until the light comes on */
   filter: drop-shadow(1px 2px 1.5px rgba(30, 18, 8, .38)) brightness(calc(1 - (1 - var(--light, 1)) * .95));
   pointer-events: none;
@@ -255,6 +255,31 @@ body[data-state="dark"] .floor-glow { opacity: 1; }
   pointer-events: none;
 }
 .book-title { font-size: calc(var(--bw) * .1px); }
+
+/* The owner's books, lower right: blocks like the booklet, covers from tools/generate_books.py. */
+.tome {
+  position: absolute;
+  width: calc(var(--bw) * 1px); height: calc(var(--bh) * 1px);
+  transform-style: preserve-3d;
+  transform: translateZ(var(--base)) rotate(var(--rot));
+  pointer-events: none;
+}
+.tome .book-shadow { transform: translate3d(4px, 6px, .2px); filter: blur(4px); }
+.tome .book-edge.spine { background: var(--board); }
+.tome-top {
+  position: absolute; inset: 0;
+  transform: translateZ(calc(var(--bt) * 1px));
+  border-radius: 1px 2px 2px 1px;
+  overflow: hidden;
+  background: var(--board); /* all that shows when the cover image is missing */
+  box-shadow: inset 3px 0 5px rgba(0, 0, 0, .12), inset -1px -1px 0 rgba(0, 0, 0, .12);
+}
+.tome-cover { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* board colours match the covers' grounds in tools/generate_books.py */
+.tome[data-book="hunter-x-hunter"] { --board: #f3efe6; }
+.tome[data-book="dictionary"] { --board: #1f2c47; }
+.tome[data-book="solitude"] { --board: #d9a23a; }
+.tome[data-book="siddhartha"] { --board: #2f5d62; }
 
 /* The booklet only lifts once the clothes are off it (.is-reachable, set by flow.js). */
 body[data-state="overhead"] .stage:not(.over-garment):not(.is-grabbing) .book3d.is-reachable:hover,

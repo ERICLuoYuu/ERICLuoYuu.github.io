@@ -110,6 +110,7 @@ function imagePlan(config) {
   ];
   if (config.photo.shade) extras.push({ key: 'photoShade', src: config.photo.shade });
   if (config.art.instruction) extras.push({ key: 'instruction', src: config.art.instruction });
+  extras.push(...(config.books ?? []).map(({ id, cover }) => ({ key: `book:${id}`, src: cover })));
   return [...art, ...extras];
 }
 
@@ -305,6 +306,16 @@ async function start() {
   else scene.pack.shade.hidden = true;
   scene.questionImg.src = resolved.questionMark;
   scene.desiccant.src = resolved.desiccant;
+  (config.books ?? []).forEach(({ id, alt }) => {
+    const tome = scene.books[id];
+    if (!tome) {
+      console.warn(`[parcel] content/site.js lists a book "${id}" that the box has no place for.`);
+      return;
+    }
+    tome.cover.alt = alt;
+    if (resolved[`book:${id}`]) tome.cover.src = resolved[`book:${id}`];
+    else tome.cover.hidden = true; // the block keeps its board colour
+  });
   app.resetInstruction();
   reportPlaceholders(config, resolved, bookView);
 

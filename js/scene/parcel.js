@@ -4,7 +4,9 @@
  * (scene.css) driven by the custom properties set here from BOX/CONTENTS.
  */
 
-import { BOX, CONTENTS, FLAP_OPEN, tapeCorners } from './geometry.js';
+import {
+  BOX, CONTENTS, BOOKS, FLAP_OPEN, baseOf, tapeCorners,
+} from './geometry.js';
 import { cssUrl } from '../core/env.js';
 
 const SIDES = ['front', 'back', 'left', 'right'];
@@ -76,8 +78,30 @@ function buildPack() {
 function buildDesiccant() {
   const { x, y, width, height, rotate } = CONTENTS.desiccant;
   const img = h('img', 'desiccant', { alt: '', draggable: 'false' });
-  img.style.cssText = `left:${x}px;top:${y}px;width:${width}px;height:${height}px;--rot:${rotate}deg`;
+  img.style.cssText = `left:${x}px;top:${y}px;width:${width}px;height:${height}px;--rot:${rotate}deg;`
+    + `--base:${baseOf(CONTENTS.desiccant)}px`;
   return img;
+}
+
+/**
+ * One of the owner's books: a block like the booklet. Its top is a board in
+ * the cover's colour with the cover image on it, so a cover that fails to
+ * load leaves a plain book rather than a hollow one.
+ */
+function buildTome({ id, x, y, width, height, thickness, rotate, ...item }) {
+  const tome = h('div', 'tome', { 'data-book': id });
+  tome.style.cssText = `left:${x}px;top:${y}px;--bw:${width};--bh:${height};--bt:${thickness};`
+    + `--rot:${rotate}deg;--base:${baseOf(item)}px`;
+  const top = h('div', 'tome-top inside');
+  const cover = h('img', 'tome-cover', { alt: '', draggable: 'false' });
+  top.append(cover);
+  tome.append(
+    h('div', 'book-shadow'),
+    ...['front', 'back', 'right'].map((s) => h('div', `book-edge pages ${s} inside`)),
+    h('div', 'book-edge spine left inside'),
+    top,
+  );
+  return { el: tome, cover };
 }
 
 function buildBook(text) {
@@ -127,8 +151,9 @@ export function buildParcel(container, { text }) {
   const pack = buildPack();
   const book = buildBook(text);
   const desiccant = buildDesiccant();
+  const books = Object.fromEntries(BOOKS.map((b) => [b.id, buildTome(b)]));
   const contents = h('div', 'contents');
-  contents.append(pack.el, desiccant, book.el);
+  contents.append(pack.el, ...Object.values(books).map((t) => t.el), desiccant, book.el);
 
   const flaps = {};
   const tapeSvgs = {};
@@ -158,7 +183,9 @@ export function buildParcel(container, { text }) {
   );
   container.append(parcel);
 
-  return { parcel, flaps, tapeSvgs, tapeProbes, question, questionImg: glyphImg, book, pack, desiccant };
+  return {
+    parcel, flaps, tapeSvgs, tapeProbes, question, questionImg: glyphImg, book, books, pack, desiccant,
+  };
 }
 
 /** Centre of an element's on-screen box (works for transformed 1px probes). */

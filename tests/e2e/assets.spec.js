@@ -79,3 +79,28 @@ test('works from a sub-folder, as on a GitHub Pages project site', async ({ page
   expect(problems).toEqual([]);
   await page.unrouteAll({ behavior: 'ignoreErrors' }); // late requests (textures) may still be on their way
 });
+
+test("the owner's books lie in the box with their covers", async ({ page }) => {
+  const problems = await openSite(page, '?jump=overhead');
+  await waitForState(page, 'overhead');
+  const covers = await page.$$eval('.tome-cover', (imgs) => imgs.map((img) => ({
+    book: img.closest('.tome').dataset.book, alt: img.alt, ok: img.complete && img.naturalWidth > 0,
+  })));
+  expect(covers.map((c) => c.book).sort()).toEqual(['dictionary', 'hunter-x-hunter', 'siddhartha', 'solitude']);
+  covers.forEach((c) => expect(c.ok, c.book).toBe(true));
+  const alts = covers.map((c) => c.alt).join(' | ');
+  ['Hunter × Hunter', 'German-Chinese dictionary', 'One Hundred Years of Solitude', 'Gabriel García Márquez', 'Siddhartha', 'Hermann Hesse']
+    .forEach((title) => expect(alts).toContain(title));
+  expect(problems).toEqual([]);
+});
+
+test('a book whose cover is missing still lies there, plain, without a broken image', async ({ page }) => {
+  await page.route('**/assets/books/solitude.webp', (route) => route.fulfill({ status: 404, body: '' }));
+  const errors = [];
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  await page.goto('/?jump=overhead');
+  await waitForState(page, 'overhead');
+  await expect(page.locator('.tome[data-book="solitude"]')).toBeVisible();
+  await expect(page.locator('.tome[data-book="solitude"] .tome-cover')).toBeHidden();
+  expect(errors.join('\n')).toContain('solitude.webp');
+});

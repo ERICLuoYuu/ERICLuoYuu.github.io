@@ -12,6 +12,7 @@
     "test:e2e": "playwright test",
     "test:live": "node -e \"process.env.BASE_URL=process.env.BASE_URL||'https://ericluoyuu.github.io/'; require('child_process').execSync('npx playwright test',{stdio:'inherit',env:process.env})\"",
     "assets:placeholders": "python tools/generate_placeholders.py",
+    "books": "python tools/generate_books.py",
     "clothes": "python tools/generate_clothes.py && node tools/build-pile.mjs"
   },
   "devDependencies": {

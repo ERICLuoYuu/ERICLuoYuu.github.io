@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BOX, CONTENTS, FLAP_OPEN } from '../../js/scene/geometry.js';
+import {
+  BOX, CONTENTS, FLAP_OPEN, BOOKS, baseOf,
+} from '../../js/scene/geometry.js';
 import { flapCorners, boxColliders, occluderQuads } from '../../js/scene/solids.js';
 
 const near = (a, b, eps = 1e-9) => assert.ok(Math.abs(a - b) < eps, `${a} ≉ ${b}`);
@@ -32,9 +34,9 @@ test('side flaps hinge on their own walls', () => {
   assert.ok(flapCorners('left', FLAP_OPEN.left)[3][0] < 0, 'the left flap opens to the left');
 });
 
-test('colliders: 4 walls, 4 open flaps, the booklet, the desiccant and the pack, each a proper box', () => {
+test('colliders: 4 walls, 4 open flaps, the booklet, the desiccant, the pack and four books, each a proper box', () => {
   const colliders = boxColliders();
-  assert.equal(colliders.length, 11);
+  assert.equal(colliders.length, 15);
   colliders.forEach(({ kind, axes, half, center }) => {
     assert.equal(kind, 'obb');
     axes.forEach((a, i) => axes.forEach((b, j) => near(dot(a, b), i === j ? 1 : 0, 1e-9)));
@@ -60,7 +62,7 @@ test('the booklet collider sits on the floor at the booklet\'s place and thickne
 
 test('occluders: the table plus every face of every collider, as planar quads', () => {
   const quads = occluderQuads();
-  assert.equal(quads.length, 1 + 11 * 6);
+  assert.equal(quads.length, 1 + 15 * 6);
   quads.forEach((quad) => {
     assert.equal(quad.length, 4);
     const [a, b, c, d] = quad;
@@ -80,4 +82,17 @@ test('the pack collider lies on the floor under its flat part, as thick as the p
   near(pack.center[1], y + height / 2);
   near(pack.center[2] - pack.half[2], 0);
   near(pack.half[2] * 2, thickness);
+});
+
+test('each book is a collider resting on the floor or on the book beneath it', () => {
+  const colliders = boxColliders();
+  BOOKS.forEach((b) => {
+    const c = colliders.find((k) => k.name === b.id);
+    near(c.center[0], b.x + b.width / 2);
+    near(c.center[1], b.y + b.height / 2);
+    near(c.center[2] - c.half[2], baseOf(b));
+    near(c.half[2] * 2, b.thickness);
+  });
+  const desiccant = colliders.find((k) => k.name === 'desiccant');
+  near(desiccant.center[2] - desiccant.half[2], baseOf(CONTENTS.desiccant));
 });

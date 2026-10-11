@@ -8,6 +8,9 @@ import { createHand, asideTarget, topParticle, dropAt } from '../../js/cloth/han
 
 const THICKNESS = 4.5; // the pile's thickness (tools/build-pile.mjs)
 const RIM = BOX.height + BOX.longFlapLift;
+// The box's walls and open flaps: what the hand works against. The things lying on
+// the floor move with every layout and would sit under these test sheets.
+const walls = () => boxColliders().filter((c) => /^(wall|flap)-/.test(c.name));
 const sheet = (cols, rows) => buildMesh({ id: 'sheet', size: [cols * 10, rows * 10], grid: { cols, rows, cells: '1'.repeat(cols * rows) } });
 /** Looking straight down: screen (sx, sy) is parcel (x, y). */
 const ray = (sx, sy) => ({ origin: [sx, sy, 3000], dir: [0, 0, -1] });
@@ -17,13 +20,13 @@ function scene(x = 230, y = 150) {
   const mesh = sheet(6, 6);
   const world = createWorld({
     garments: [{ mesh, material: { stretchCompliance: 0, bendCompliance: 2e-4, friction: 0.5 } }],
-    colliders: boxColliders(),
+    colliders: walls(),
     bounds: { min: [-700, -600, 0], max: [1200, 1000, 700] },
     thickness: THICKNESS,
   });
   setPositions(world, 0, Float32Array.from(mesh.rest, (v, i) => v + [x - 30, y - 30, THICKNESS / 2][i % 3]));
   sleepAll(world);
-  return { world, hand: createHand({ world, colliders: boxColliders(), ray }) };
+  return { world, hand: createHand({ world, colliders: walls(), ray }) };
 }
 
 /** Advance hand and world together, like the layer's animation frames. */
@@ -123,7 +126,7 @@ test('aside means over the gentle right or front flap onto the table — never l
 test('without motion, a move just puts the garment down beyond the wall, awake to settle', () => {
   const { world } = scene(330, 150);
   const to = asideTarget(world, 0);
-  dropAt(world, boxColliders(), 0, to);
+  dropAt(world, walls(), 0, to);
   const [x, y] = centroid(world, 0);
   assert.ok(Math.abs(x - to[0]) < 1 && Math.abs(y - to[1]) < 1);
   assert.equal(world.awake[0], 1);
@@ -146,14 +149,14 @@ test('cloth carried along on the held garment does not lift the hand ever higher
   const rider = sheet(2, 2);
   const world = createWorld({
     garments: [lower, rider].map((mesh) => ({ mesh, material: { stretchCompliance: 0, bendCompliance: 2e-4, friction: 0.5 } })),
-    colliders: boxColliders(),
+    colliders: walls(),
     bounds: { min: [-700, -600, 0], max: [1200, 1000, 700] },
     thickness: THICKNESS,
   });
   setPositions(world, 0, Float32Array.from(lower.rest, (v, i) => v + [200, 120, THICKNESS / 2][i % 3]));
   setPositions(world, 1, Float32Array.from(rider.rest, (v, i) => v + [-1000, 0, THICKNESS / 2][i % 3]));
   sleepAll(world);
-  const hand = createHand({ world, colliders: boxColliders(), ray });
+  const hand = createHand({ world, colliders: walls(), ray });
   const i = topParticle(world, 0);
   hand.grab(hitAt(world, i), world.pos[3 * i], world.pos[3 * i + 1]);
   for (let f = 0; f < 60; f += 1) {

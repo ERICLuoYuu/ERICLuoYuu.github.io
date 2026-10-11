@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BOX, CONTENTS, frameFor, tapeCorners, rimMagnification } from '../../js/scene/geometry.js';
+import {
+  BOX, CONTENTS, BOOKS, baseOf, frameFor, tapeCorners, rimMagnification,
+} from '../../js/scene/geometry.js';
 
 const screens = [
   { width: 1440, height: 900 }, { width: 1024, height: 768 }, { width: 390, height: 844 },
@@ -52,6 +54,33 @@ const footprint = ({ x, y, width, height, rotate }) => {
   return { left: cx - hx, right: cx + hx, top: cy - hy, bottom: cy + hy };
 };
 
+/** Corners of a rotated rectangle lying on the floor, as [x, y]. */
+const corners = ({ x, y, width, height, rotate }) => {
+  const a = (rotate * Math.PI) / 180;
+  const [cx, cy] = [x + width / 2, y + height / 2];
+  return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([s, t]) => {
+    const [u, v] = [(s * width) / 2, (t * height) / 2];
+    return [cx + u * Math.cos(a) - v * Math.sin(a), cy + u * Math.sin(a) + v * Math.cos(a)];
+  });
+};
+/** A floor point in a rectangle's own frame: (0, 0) at its top-left corner. */
+const local = ([px, py], { x, y, width, height, rotate }) => {
+  const a = (-rotate * Math.PI) / 180;
+  const [dx, dy] = [px - x - width / 2, py - y - height / 2];
+  return [dx * Math.cos(a) - dy * Math.sin(a) + width / 2, dx * Math.sin(a) + dy * Math.cos(a) + height / 2];
+};
+/** Do two rotated rectangles overlap (separating axis test)? */
+const overlaps = (p, q) => {
+  const [a, b] = [corners(p), corners(q)];
+  return [a, b].every((shape) => shape.every((c, i) => {
+    const next = shape[(i + 1) % 4];
+    const axis = [c[1] - next[1], next[0] - c[0]];
+    const span = (pts) => pts.map(([x, y]) => x * axis[0] + y * axis[1]);
+    const [sa, sb] = [span(a), span(b)];
+    return Math.max(...sa) >= Math.min(...sb) && Math.max(...sb) >= Math.min(...sa);
+  }));
+};
+
 test('pack, booklet and desiccant lie inside the walls without overlapping', () => {
   const inner = { left: 2, right: BOX.width - 2, top: 2, bottom: BOX.depth - 2 };
   const [pack, book, desiccant] = ['pack', 'book', 'desiccant'].map((k) => footprint(CONTENTS[k]));
@@ -75,4 +104,26 @@ test('the booklet lies in the upper right, where the pile goes', () => {
   const book = footprint(CONTENTS.book);
   assert.ok(book.left >= 195 && book.bottom <= 165, `booklet from x ${book.left.toFixed(0)}, down to y ${book.bottom.toFixed(0)}`);
   assert.deepEqual([CONTENTS.book.width, CONTENTS.book.height], [96, 134], 'the old booklet, smaller, same proportions');
+});
+
+test('the books lie in the lower-right quarter, on the floor or on another book', () => {
+  BOOKS.forEach((b) => {
+    const f = footprint(b);
+    assert.ok(f.left >= 195 && f.right <= BOX.width - 2 && f.top >= 158 && f.bottom <= BOX.depth - 2, `${b.id} in the lower right`);
+  });
+  const onFloor = [{ ...CONTENTS.book, id: 'booklet' }, { ...CONTENTS.pack, id: 'pack' }, ...BOOKS.filter((b) => !b.on)];
+  onFloor.forEach((a, i) => onFloor.slice(i + 1).forEach((b) => assert.ok(!overlaps(a, b), `${a.id} and ${b.id} overlap`)));
+});
+
+test('what lies on a book lies within its cover, at its height', () => {
+  [...BOOKS.filter((b) => b.on), { ...CONTENTS.desiccant, id: 'desiccant' }].forEach((item) => {
+    const below = BOOKS.find((b) => b.id === item.on);
+    corners(item).forEach((p) => {
+      const [u, v] = local(p, below);
+      assert.ok(u >= 0 && u <= below.width && v >= 0 && v <= below.height, `${item.id} lies on ${below.id}`);
+    });
+    assert.equal(baseOf(item), baseOf(below) + below.thickness);
+  });
+  assert.equal(baseOf(CONTENTS.book), 0);
+  assert.throws(() => baseOf({ on: 'nowhere' }), /nowhere/);
 });

@@ -4,7 +4,9 @@
  * bump into them and the WebGL layer can hide clothes behind them. Pure — no DOM.
  */
 
-import { BOX, CONTENTS, FLAP_OPEN, rotateX, rotateZ } from './geometry.js';
+import {
+  BOX, CONTENTS, BOOKS, FLAP_OPEN, baseOf, rotateX, rotateZ,
+} from './geometry.js';
 
 const WALL = 2; // .face.inner sits 2px inside the outer face
 const FLAP = 1; // .flap .face.inner sits 1px under the outer face
@@ -73,15 +75,16 @@ function floorItemCollider(name, { x, y, width, height, thickness, rotate }, bas
   return obb(name, centre, axes, [width / 2, height / 2, thickness / 2]);
 }
 
-/** Oriented boxes for the walls, the open flaps, the booklet, the desiccant and the pack. */
+/** Oriented boxes for the walls, the open flaps, the booklet, the desiccant, the pack and the books. */
 export function boxColliders() {
   const sides = Object.keys(SIDES);
   return [
     ...sides.map(wallCollider),
     ...sides.map(flapCollider),
     floorItemCollider('book', CONTENTS.book, 0.6), // .book3d: translateZ(.6px)
-    floorItemCollider('desiccant', CONTENTS.desiccant, 0),
+    floorItemCollider('desiccant', CONTENTS.desiccant, baseOf(CONTENTS.desiccant)),
     floorItemCollider('pack', CONTENTS.pack, 0),
+    ...BOOKS.map((b) => floorItemCollider(b.id, b, baseOf(b))),
   ];
 }
 

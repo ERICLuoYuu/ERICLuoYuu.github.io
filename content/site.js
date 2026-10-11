@@ -78,6 +78,14 @@ export default {
     alt: '[Draft — check this] A collage: a person in a red top and blue floral skirt lies under crinkled clear plastic, as if vacuum-packed, surrounded by sushi, fries, strawberries, a fruit-and-yogurt bowl and dumplings.',
   },
 
+  /** Books you like, lying in the lower right of the box (tools/generate_books.py draws the covers). */
+  books: [
+    { id: 'hunter-x-hunter', cover: 'assets/books/hunter-x-hunter.webp', alt: 'Hunter × Hunter, a manga volume' },
+    { id: 'dictionary', cover: 'assets/books/dictionary.webp', alt: 'A German-Chinese dictionary' },
+    { id: 'solitude', cover: 'assets/books/solitude.webp', alt: 'One Hundred Years of Solitude, by Gabriel García Márquez' },
+    { id: 'siddhartha', cover: 'assets/books/siddhartha.webp', alt: 'Siddhartha, by Hermann Hesse' },
+  ],
+
   /**
    * Handwriting. Leave `font` empty to use the bundled Caveat font, or point
    * it at your own handwriting font (.woff2 / .woff / .ttf / .otf).
