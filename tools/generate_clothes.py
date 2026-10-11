@@ -28,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))  # run as a script: mak
 
 from clothes.canvas import PX, Canvas  # noqa: E402
 from clothes.fit import CELL, fit, grid_shape  # noqa: E402
+from clothes.modern import floral_skirt, ruched_top, slip_skirt, tee_breton, tee_white  # noqa: E402
 from clothes.traditional import blouse, mamianqun, qipao  # noqa: E402
 from pack_body import pack_record  # noqa: E402
 
@@ -55,6 +56,11 @@ GARMENTS = [
     Garment("qipao", "qipao", (190, 400), material(1e-4, 0.35, 0.6, 1.6), (0.5, 0.02), qipao),
     Garment("blouse", "mandarin-collar blouse", (300, 230), material(1.5e-4, 0.4, 0.25, 1.3), (0.5, 0.03), blouse),
     Garment("mamianqun", "horse-face skirt", (280, 262), material(6e-5, 0.5, 0.3, 1.8), (0.5, 0.55), mamianqun),
+    Garment("tee-white", "white T-shirt", (290, 250), material(2.5e-4, 0.6, 0.04, 1.2), (0.5, 0.04), tee_white),
+    Garment("tee-breton", "striped top", (300, 260), material(2e-4, 0.6, 0.04, 1.2), (0.5, 0.03), tee_breton),
+    Garment("slip-skirt", "satin slip skirt", (200, 272), material(6e-4, 0.3, 0.8, 0.6), (0.5, 0.95), slip_skirt),
+    Garment("ruched-top", "red ruched top", (220, 190), material(3e-4, 0.55, 0.12, 1.5), (0.5, 0.2), ruched_top),
+    Garment("floral-skirt", "floral midi skirt", (230, 300), material(3e-4, 0.45, 0.08, 1.0), (0.5, 0.04), floral_skirt),
 ]
 
 

@@ -109,7 +109,7 @@ test('the pack is the last body: a heavy, stiff film the size of the pack in the
 test('redrawn garments have an aligned relief map, a signature and core cells inside their cloth', async () => {
   const data = await readJson('assets/clothes/garments.json');
   const redrawn = data.garments.filter((g) => g.relief && g.kind !== 'film');
-  ['qipao', 'blouse', 'mamianqun'].forEach((id) => assert.ok(redrawn.some((g) => g.id === id), `${id} is redrawn`));
+  assert.equal(redrawn.length, data.garments.filter((g) => g.kind !== 'film').length, 'every garment is drawn with relief');
   await Promise.all(redrawn.map(async (g) => {
     const [colour, relief] = await Promise.all([g.texture, g.relief].map((p) => readFile(new URL(p, ROOT))));
     assert.deepEqual(webpSize(relief), webpSize(colour), `${g.id}: relief and colour line up`);
