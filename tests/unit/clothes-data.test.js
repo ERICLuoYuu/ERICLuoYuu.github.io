@@ -45,7 +45,8 @@ test('garments.json lists the eight garments with textures, grids and materials'
 
 test('pile.json is a settled pile that hides the booklet and leaves the pack in view', async () => {
   const { createWorld, setPositions } = await import('../../js/cloth/solver.js');
-  const { bookCoverage } = await import('../../js/cloth/coverage.js');
+  const { bookCoverage, isExposed } = await import('../../js/cloth/coverage.js');
+  const { particleNear } = await import('../../js/cloth/mesh.js');
   const { CONTENTS } = await import('../../js/scene/geometry.js');
   const data = await readJson('assets/clothes/garments.json');
   const pile = await readJson('assets/clothes/pile.json');
@@ -69,6 +70,9 @@ test('pile.json is a settled pile that hides the booklet and leaves the pack in 
     }
     setPositions(world, g, Float32Array.from(positions));
   });
+  const seen = data.garments.filter(({ signature, size }, g) => signature && isExposed(world,
+    world.offsets[g] + particleNear(meshes[g], [signature[0] * size[0], signature[1] * size[1]])));
+  assert.ok(seen.length >= 6, `signatures in view: ${seen.map((g) => g.id).join(', ')}`);
   assert.ok(bookCoverage(world, CONTENTS.book) >= 0.85, 'the booklet is hidden');
   assert.ok(bookCoverage(world, CONTENTS.pack) <= 0.25, 'the pack stays mostly visible');
 });

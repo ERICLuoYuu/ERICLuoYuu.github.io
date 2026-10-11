@@ -61,3 +61,16 @@ export function bookCoverage(world, book, { cols = 8, rows = 11, radius = 9 } = 
 export function isBookUncovered(coverage, wasUncovered) { // eslint-disable-line no-unused-vars
   return coverage < 0.35;
 }
+
+/** Can particle i be seen from above: no cloth lies over it within `radius`? */
+export function isExposed(world, i, radius = 7) {
+  const x = world.pos[3 * i];
+  const y = world.pos[3 * i + 1];
+  const above = world.pos[3 * i + 2] + world.thickness / 2;
+  const r2 = radius * radius;
+  for (let j = 0; j < world.count; j += 1) {
+    const p = 3 * j;
+    if (world.pos[p + 2] > above && (world.pos[p] - x) ** 2 + (world.pos[p + 1] - y) ** 2 < r2) return false;
+  }
+  return true;
+}

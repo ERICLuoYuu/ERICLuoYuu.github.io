@@ -101,3 +101,17 @@ export function buildMesh(garment) {
     lattice: Object.freeze({ cols, rows, at: lattice, cells }),
   });
 }
+
+/** The particle lying nearest (x, y) in the garment's flat layout. */
+export function particleNear({ count, rest }, [x, y]) {
+  let best = 0;
+  let bestDistance = Infinity;
+  for (let v = 0; v < count; v += 1) {
+    const d = (rest[3 * v] - x) ** 2 + (rest[3 * v + 1] - y) ** 2;
+    if (d < bestDistance) {
+      best = v;
+      bestDistance = d;
+    }
+  }
+  return best;
+}

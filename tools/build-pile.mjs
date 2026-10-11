@@ -5,17 +5,17 @@
  *   node tools/build-pile.mjs        (npm run clothes runs it after the art)
  *
  * The pack (a film body) lies flat in its place first; each garment is then
- * laid out flat, folded a little (sleeves in, halves over), turned and
- * dropped onto the booklet in the upper right with the same solver the site
- * uses.
+ * laid loosely with at most one fold, turned and dropped onto the booklet in
+ * the upper right with the same solver the site uses.
  * The result goes to assets/clothes/pile.json. If the pile does not hide the
- * booklet or covers too much of the pack, the next random seed is tried.
+ * booklet, covers too much of the pack or shows fewer than six signature
+ * features, the next random seed is tried.
  */
 
 import { readFile, writeFile } from 'node:fs/promises';
-import { buildMesh } from '../js/cloth/mesh.js';
+import { buildMesh, particleNear } from '../js/cloth/mesh.js';
 import { createWorld, setPositions, sleep, step, centroid } from '../js/cloth/solver.js';
-import { bookCoverage } from '../js/cloth/coverage.js';
+import { bookCoverage, isExposed } from '../js/cloth/coverage.js';
 import { boxColliders } from '../js/scene/solids.js';
 import { BOX, CONTENTS } from '../js/scene/geometry.js';
 
@@ -25,25 +25,31 @@ const BOUNDS = { min: [-900, -900, 0], max: [1300, 1300, 900] };
 // Where particle centres may be laid: the walls are 2 thick, plus a particle radius and a little air.
 const INSIDE = { min: [8, 8], max: [BOX.width - 8, BOX.depth - 8] };
 const PARKED_X = -3000; // garments wait far away until it is their turn
-const TARGETS = { book: 0.88, pack: 0.2 };
+const TARGETS = { book: 0.88, pack: 0.2, signatures: 6 };
 const JITTER = { turn: 16, shift: 6 }; // degrees and units of random variation per seed
 const DROP_GAP = 12; // each garment is dropped this far above the pile so far
 
 /**
- * Bottom to top, over the booklet in the upper right. fold: [axis, at, keep]
- * folds everything beyond the line axis = at — a share of the garment's
- * width for 'x', of its length for 'y' — back over the near side; keep
- * 'low' keeps the side below `at`. turn in degrees, centre in parcel units.
+ * Bottom to top. Each garment lies loosely with at most one fold:
+ * [axis, at, keep, side] folds everything on the far side of the line
+ * axis = at (a share of the garment's width for 'x', of its length for 'y')
+ * onto the kept side — 'x' folds left/right, 'y' up/down; keep
+ * 'low' keeps the side below `at` — laying it 'over' (on top) or tucking it
+ * 'under'. turn in degrees (0: collar or waist towards the back wall), centre
+ * in parcel units. The horse-face skirt lies flat under everything, over the
+ * booklet; the others fan out from it, each with its signature feature past
+ * the skirt's edge (a collar left or right, the floral waistband right) or on
+ * top (the slip skirt's lace, the ruched top's neckline, the qipao's collar).
  */
 const PLAN = [
-  { id: 'mamianqun', folds: [['x', 0.5, 'low']], turn: 84, centre: [306, 101] },
-  { id: 'tee-breton', folds: [['x', 0.24, 'high'], ['x', 0.76, 'low']], turn: -8, centre: [300, 59] },
-  { id: 'slip-skirt', folds: [['y', 0.55, 'low']], turn: 100, centre: [319, 105] },
-  { id: 'qipao', folds: [['y', 0.5, 'low']], turn: 70, centre: [294, 78] },
-  { id: 'tee-white', folds: [['x', 0.24, 'high'], ['x', 0.76, 'low']], turn: 18, centre: [309, 66] },
-  { id: 'blouse', folds: [['x', 0.27, 'high'], ['x', 0.73, 'low']], turn: -24, centre: [291, 105] },
-  { id: 'floral-skirt', folds: [['y', 0.5, 'low']], turn: -66, centre: [329, 80] },
-  { id: 'ruched-top', folds: [], turn: 28, centre: [284, 66] },
+  { id: 'mamianqun', folds: [], turn: 90, centre: [300, 80] },
+  { id: 'floral-skirt', folds: [], turn: 90, centre: [355, 48] },
+  { id: 'tee-breton', folds: [], turn: -90, centre: [252, 56] },
+  { id: 'tee-white', folds: [], turn: 90, centre: [360, 118] },
+  { id: 'blouse', folds: [], turn: -90, centre: [248, 122] },
+  { id: 'qipao', folds: [], turn: 30, centre: [304, 76] },
+  { id: 'slip-skirt', folds: [], turn: -8, centre: [296, 88] },
+  { id: 'ruched-top', folds: [], turn: 0, centre: [265, 35] },
 ];
 
 /** Small seeded random numbers (mulberry32). */
@@ -58,18 +64,16 @@ function random(seed) {
   };
 }
 
-/** Fold flat positions over a line (see PLAN); the folded part lies one layer higher. */
-function fold(positions, [axis, at, keep], size) {
+/** Fold flat positions over a line (see PLAN); the layer on top lies one thickness higher. */
+function fold(positions, [axis, at, keep, side = 'over'], size) {
   const k = axis === 'x' ? 0 : 1;
   const line = at * size[k];
   const out = Float32Array.from(positions);
   for (let i = 0; i < out.length; i += 3) {
     const v = out[i + k];
     const far = keep === 'low' ? v > line : v < line;
-    if (far) {
-      out[i + k] = 2 * line - v;
-      out[i + 2] += THICKNESS;
-    }
+    if (far) out[i + k] = 2 * line - v;
+    if (far === (side === 'over')) out[i + 2] += THICKNESS;
   }
   return out;
 }
@@ -155,7 +159,15 @@ function buildPile(garments, seed) {
     if (!settle(world, 8)) console.warn(`  ${placement.id} was still moving after 8 s; it is put to sleep where it is`);
   });
   world.counts.forEach((_, g) => { if (world.awake[g]) sleep(world, g); });
-  return world;
+  return { world, meshes };
+}
+
+/** Ids of the garments whose signature feature can be seen from above. */
+function visibleSignatures(world, garments, meshes) {
+  return garments
+    .filter(({ signature, size }, g) => signature
+      && isExposed(world, world.offsets[g] + particleNear(meshes[g], [signature[0] * size[0], signature[1] * size[1]])))
+    .map(({ id }) => id);
 }
 
 async function main() {
@@ -166,12 +178,14 @@ async function main() {
   }
   for (let seed = 11; seed < 31; seed += 1) {
     const started = Date.now();
-    const world = buildPile(data.garments, seed);
+    const { world, meshes } = buildPile(data.garments, seed);
     const book = bookCoverage(world, CONTENTS.book);
     const pack = bookCoverage(world, CONTENTS.pack);
+    const seen = visibleSignatures(world, data.garments, meshes);
     const seconds = ((Date.now() - started) / 1000).toFixed(1);
-    console.log(`seed ${seed}: booklet ${(book * 100).toFixed(0)} % hidden, pack ${(pack * 100).toFixed(0)} % covered (${seconds} s)`);
-    if (book >= TARGETS.book && pack <= TARGETS.pack) {
+    console.log(`seed ${seed}: booklet ${(book * 100).toFixed(0)} % hidden, pack ${(pack * 100).toFixed(0)} % covered, `
+      + `${seen.length} signatures in view (${seen.join(', ')}) (${seconds} s)`);
+    if (book >= TARGETS.book && pack <= TARGETS.pack && seen.length >= TARGETS.signatures) {
       const garments = data.garments.map(({ id }, g) => ({
         id,
         positions: Array.from(world.pos.subarray(3 * world.offsets[g], 3 * (world.offsets[g] + world.counts[g])), (v) => Math.round(v * 10) / 10),
@@ -183,7 +197,7 @@ async function main() {
       return;
     }
   }
-  throw new Error('No seed produced a pile that hides the booklet; adjust PLAN.');
+  throw new Error('No seed produced a pile that hides the booklet, spares the pack and shows the garments; adjust PLAN.');
 }
 
 main().catch((err) => {

@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildMesh } from '../../js/cloth/mesh.js';
+import { buildMesh, particleNear } from '../../js/cloth/mesh.js';
 import { createWorld, setPositions } from '../../js/cloth/solver.js';
-import { bookCoverage, isBookUncovered } from '../../js/cloth/coverage.js';
+import { bookCoverage, isBookUncovered, isExposed } from '../../js/cloth/coverage.js';
 import { CONTENTS } from '../../js/scene/geometry.js';
 
 const book = CONTENTS.book;
@@ -62,4 +62,18 @@ test('cloth that touches no core cell does not cover the booklet', () => {
   };
   assert.equal(bookCoverage(lying('1'.repeat(16)), book), 1);
   assert.equal(bookCoverage(lying('0'.repeat(16)), book), 0);
+});
+
+test('a particle is exposed unless cloth lies over it', () => {
+  const material = { stretchCompliance: 0, bendCompliance: 1e-4, friction: 0.5 };
+  const lower = buildMesh({ id: 'lower', size: [40, 40], grid: { cols: 4, rows: 4, cells: '1'.repeat(16) } });
+  const upper = buildMesh({ id: 'upper', size: [20, 40], grid: { cols: 2, rows: 4, cells: '1'.repeat(8) } });
+  const w = createWorld({ garments: [{ mesh: lower, material }, { mesh: upper, material }],
+    bounds: { min: [-100, -100, 0], max: [200, 200, 200] }, thickness: 7.5 });
+  setPositions(w, 0, Float32Array.from(lower.rest, (v, i) => (i % 3 === 2 ? 3.75 : v)));
+  setPositions(w, 1, Float32Array.from(upper.rest, (v, i) => (i % 3 === 2 ? 11.25 : v)));
+  const at = (g, x, y) => w.offsets[g] + particleNear(g === 0 ? lower : upper, [x, y]);
+  assert.equal(isExposed(w, at(0, 10, 20)), false, 'under the upper sheet');
+  assert.equal(isExposed(w, at(0, 40, 20)), true, 'beyond its edge');
+  assert.equal(isExposed(w, at(1, 10, 20)), true, 'the upper sheet itself');
 });

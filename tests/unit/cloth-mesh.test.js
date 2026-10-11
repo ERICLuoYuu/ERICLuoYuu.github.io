@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildMesh } from '../../js/cloth/mesh.js';
+import { buildMesh, particleNear } from '../../js/cloth/mesh.js';
 
 const garment = (cells, cols, rows, size = [cols * 10, rows * 10]) => ({ id: 'test', size, grid: { cols, rows, cells } });
 const distance = (m, a, b) => Math.hypot(
@@ -84,4 +84,10 @@ test('the lattice maps every grid corner to its particle, or −1', () => {
     }
   }
   assert.equal(at[2], -1, 'corner (2, 0) touches no covered cell');
+});
+
+test('particleNear finds the particle nearest a point of the flat layout', () => {
+  const m = buildMesh(garment('1111', 2, 2));
+  const v = particleNear(m, [19, 1]);
+  assert.deepEqual([m.rest[3 * v], m.rest[3 * v + 1]], [20, 0]);
 });
