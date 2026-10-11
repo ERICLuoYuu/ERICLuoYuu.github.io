@@ -39,12 +39,13 @@ export function createFlow(app) {
   const hasClothes = () => Boolean(app.clothes?.enabled);
   let reachable = true;
 
-  /** Booklet reachable or not: its tab stop, hover lift and the hint follow. */
+  /** Booklet reachable or not: its tab stop, hover lift, what screen readers hear and the hint follow. */
   function setReachable(on) {
     reachable = on;
     const overhead = machine.state === 'overhead';
     scene.book.el.classList.toggle('is-reachable', on);
     scene.book.button.tabIndex = on && overhead ? 0 : -1;
+    scene.book.button.setAttribute('aria-disabled', String(!on));
     dom.clothesHint.hidden = on || !overhead || !hasClothes();
   }
 
@@ -117,7 +118,10 @@ export function createFlow(app) {
   const layoutNow = () => computeBookLayout({ width: innerWidth, height: innerHeight });
 
   async function openBook() {
-    if (!reachable) return;
+    if (!reachable) { // only a screen reader's browsing can still press it
+      announce(text.clothesHint);
+      return;
+    }
     const ran = await machine.perform('OPEN_BOOK', async () => {
       sound.unlock();
       sound.play('whoosh', { volume: 0.8 });
@@ -163,6 +167,7 @@ export function createFlow(app) {
     if (!ran) return;
     scene.book.button.focus({ preventScroll: true });
     announce('The book is back in the box.');
+    updateBook(); // clothes that came to rest while the book was open may have buried it again
   }
 
   function resetScene() {

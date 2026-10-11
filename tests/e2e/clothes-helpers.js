@@ -2,7 +2,10 @@ import { expect } from '@playwright/test';
 
 export const clothesOf = (page) => page.evaluate(() => window.__parcel.clothes());
 
-export async function waitForSettled(page, timeout = 20_000) {
+// A move settles in about 3–6 s of simulated time. A loaded machine (tests in
+// parallel, all drawing WebGL) plays the cloth in slow motion rather than
+// skipping frames, which stretches that in real time.
+export async function waitForSettled(page, timeout = 30_000) {
   await page.waitForFunction(() => window.__parcel.clothes().settled, null, { timeout });
 }
 

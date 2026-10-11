@@ -4,6 +4,12 @@ import {
   clothesOf, waitForSettled, pointOn, dragMouse, clearWithKeyboard, tabToBooklet,
 } from './clothes-helpers.js';
 
+const shownKeys = (page) => page.locator('.clothes-key:not([hidden])');
+const focusedKey = (page) => page.evaluate(() => {
+  const el = document.activeElement;
+  return el?.classList.contains('clothes-key') ? el.getAttribute('aria-label') : null;
+});
+
 const centreOf = async (page, id) => (await clothesOf(page)).garments.find((g) => g.id === id).centre;
 const distance = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
@@ -19,6 +25,11 @@ test.describe('clothes in the box (desktop)', () => {
     const book = await page.locator('.book-top').boundingBox();
     await page.mouse.click(book.x + book.width / 2, book.y + book.height / 2);
     await page.waitForTimeout(600);
+    expect(await stateOf(page)).toBe('overhead');
+    // screen readers can still reach it by browsing: it says it is unavailable, and why
+    await expect(page.locator('.book-top')).toHaveAttribute('aria-disabled', 'true');
+    await page.$eval('.book-top', (el) => el.click());
+    await expect(page.locator('#announcer')).toHaveText('Move the clothes aside to find what’s underneath.');
     expect(await stateOf(page)).toBe('overhead');
     expect(problems).toEqual([]);
   });
@@ -130,12 +141,55 @@ test.describe('clothes in the box (desktop)', () => {
     await openSite(page, '?jump=clear');
     await waitForState(page, 'overhead');
     expect((await clothesOf(page)).reachable).toBe(true);
+    await expect(page.locator('.book-top')).toHaveAttribute('aria-disabled', 'false');
     await page.click('.book-top');
     await waitForState(page, 'reading', 15_000);
   });
 
+  test('a garment taken out of the box with the mouse no longer has a keyboard button', async ({ page }) => {
+    await openSite(page, '?jump=overhead');
+    await waitForState(page, 'overhead');
+    const before = await shownKeys(page).count();
+    const point = await pointOn(page);
+    await dragMouse(page, point, { x: point.x, y: page.viewportSize().height - 4 });
+    await waitForSettled(page);
+    await expect(shownKeys(page)).toHaveCount(before - 1);
+  });
+
+  test('losing the graphics mid-move does not jam the keyboard moves', async ({ page }) => {
+    const problems = await openSite(page, '?jump=overhead');
+    await waitForState(page, 'overhead');
+    await shownKeys(page).first().focus();
+    const garment = (await focusedKey(page)).replace(/^Move the (.+) aside$/, '$1');
+    const lose = await page.evaluate(() => {
+      window.__lose = document.getElementById('clothes').getContext('webgl2').getExtension('WEBGL_lose_context');
+      return Boolean(window.__lose);
+    });
+    test.skip(!lose, 'this browser cannot simulate a lost context');
+    await page.keyboard.press('Enter');
+    await page.evaluate(() => window.__lose.loseContext());
+    await expect(page.locator('#announcer')).toHaveText(`The ${garment} is out of the way.`, { timeout: 8000 });
+    await page.evaluate(() => window.__lose.restoreContext());
+    expect(problems).toEqual([]);
+  });
+
   test.describe('with reduced motion', () => {
     test.beforeEach(async ({ page }) => { await page.emulateMedia({ reducedMotion: 'reduce' }); });
+
+    test('after the very last garment, keyboard focus moves on to the booklet', async ({ page }) => {
+      test.setTimeout(90_000);
+      await openSite(page, '?jump=overhead');
+      await waitForState(page, 'overhead');
+      await shownKeys(page).first().focus();
+      for (let n = 0; n < 12 && await focusedKey(page); n += 1) {
+        await page.keyboard.press('Enter');
+        await waitForSettled(page);
+      }
+      await expect(shownKeys(page)).toHaveCount(0);
+      await expect(page.locator('.book-top')).toBeFocused();
+      await page.keyboard.press('Enter');
+      await waitForState(page, 'reading', 15_000);
+    });
 
     test('keyboard moves finish quickly, without a carrying arc', async ({ page }) => {
       await openSite(page, '?jump=overhead');

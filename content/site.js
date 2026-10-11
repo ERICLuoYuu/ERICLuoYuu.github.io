@@ -34,6 +34,7 @@ export default {
     clothesHint: 'Move the clothes aside to find what’s underneath.',
     moveAside: 'Move the {garment} aside', // a keyboard button per garment
     movedAside: 'The {garment} is out of the way.',
+    moveFailed: 'The {garment} could not be moved just now. Try again, or drag it aside.',
     bookUncovered: 'The little book is uncovered.',
     bookTitle: 'About me',
     ownerLine: 'this little book belongs to',

@@ -175,7 +175,9 @@ function wireClothes(app, flow) {
     ? createClothesInput({ stage: dom.stage, clothes, canInteract: () => machine.state === 'overhead' })
     : { cancel() {} };
   app.clothesKeys = clothes.enabled
-    ? createClothesKeys({ host: $('clothes-controls'), clothes, text: app.text, announce: app.announce })
+    ? createClothesKeys({
+      host: $('clothes-controls'), clothes, text: app.text, announce: app.announce, afterLast: () => app.scene.book.button,
+    })
     : NO_KEYS;
   flow.attachClothes();
   let timer = 0;

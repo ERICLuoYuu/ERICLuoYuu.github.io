@@ -12,10 +12,10 @@
 const CLICK_GRACE = 400; // ms: how long after a drag the click it causes is swallowed
 
 /**
- * @param {{stage: HTMLElement, clothes: object, canInteract: () => boolean, onDragEnd?: () => void}} options
+ * @param {{stage: HTMLElement, clothes: object, canInteract: () => boolean}} options
  * @returns {{cancel(): void, dispose(): void}}
  */
-export function createClothesInput({ stage, clothes, canInteract, onDragEnd = () => {} }) {
+export function createClothesInput({ stage, clothes, canInteract }) {
   let drag = null; // { pointerId } while a garment is held
   let hover = null; // last idle mouse position, waiting to be picked
   let hoverFrame = 0;
@@ -39,18 +39,18 @@ export function createClothesInput({ stage, clothes, canInteract, onDragEnd = ()
     if (!hoverFrame) hoverFrame = requestAnimationFrame(checkHover);
   }
 
-  /** Let go of whatever is held. */
-  function endDrag() {
+  /** Let go of whatever is held. Only a real release (`clicks`) is followed by a click to swallow. */
+  function endDrag(clicks = false) {
     if (!drag) return;
     const { pointerId } = drag;
     drag = null;
     if (stage.hasPointerCapture?.(pointerId)) stage.releasePointerCapture(pointerId);
     clothes.release();
     stage.classList.remove('is-grabbing');
+    if (!clicks) return;
     swallowClick = true;
     clearTimeout(swallowTimer);
     swallowTimer = setTimeout(() => { swallowClick = false; }, CLICK_GRACE);
-    onDragEnd();
   }
 
   function onDown(event) {
@@ -88,7 +88,7 @@ export function createClothesInput({ stage, clothes, canInteract, onDragEnd = ()
 
   function onEnd(event) {
     if (!drag || event.pointerId !== drag.pointerId) return;
-    endDrag();
+    endDrag(event.type === 'pointerup');
     if (event.pointerType === 'mouse' && event.type === 'pointerup') watchHover(event);
   }
 
@@ -120,7 +120,7 @@ export function createClothesInput({ stage, clothes, canInteract, onDragEnd = ()
     [stage, 'lostpointercapture', onEnd],
     [stage, 'pointerleave', onLeave],
     [globalThis, 'click', onClick, { capture: true }],
-    [globalThis, 'blur', endDrag],
+    [globalThis, 'blur', () => endDrag()],
   ];
   listeners.forEach(([target, type, fn, options]) => target.addEventListener(type, fn, options));
 

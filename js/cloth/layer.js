@@ -146,7 +146,7 @@ function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
   const active = () => world.grip !== null || !isSettled(world);
 
   function schedule() {
-    if (!frameId && visible && !lost) frameId = requestAnimationFrame(tick);
+    if (!frameId && visible) frameId = requestAnimationFrame(tick);
   }
 
   function invalidate() {
@@ -197,9 +197,9 @@ function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
     });
   }
 
+  /** One animation frame. Without a graphics context the cloth still moves (a carry still ends); only drawing waits. */
   function tick(now) {
     frameId = 0;
-    if (lost) return;
     if (active()) {
       const elapsed = last ? Math.min(0.25, (now - last) / 1000) : STEP;
       last = now;
@@ -219,7 +219,7 @@ function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
         settleListeners.forEach((fn) => fn());
       }
     }
-    if (dirty) draw();
+    if (dirty && !lost) draw();
     if (active()) schedule();
   }
 
@@ -284,10 +284,8 @@ function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
     if (!document.hidden) invalidate();
   });
   canvas.addEventListener('webglcontextlost', (event) => {
-    event.preventDefault();
+    event.preventDefault(); // ask for it back
     lost = true;
-    cancelAnimationFrame(frameId);
-    frameId = 0;
   });
   canvas.addEventListener('webglcontextrestored', () => {
     try {
