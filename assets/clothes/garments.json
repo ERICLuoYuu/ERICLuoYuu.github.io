@@ -192,7 +192,7 @@
    },
    "material": {
     "stretchCompliance": 0,
-    "bendCompliance": 0.0003,
+    "bendCompliance": 0.00015,
     "friction": 0.55,
     "sheen": 0.12,
     "bump": 1.5

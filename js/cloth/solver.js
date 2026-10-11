@@ -16,11 +16,11 @@ import { createHash } from './hash.js';
 import { collideBox, collidePair, collidePlane, prepareCollider } from './collide.js';
 
 export const DEFAULTS = Object.freeze({
-  gravity: -2400, // lighter than real gravity: garments drift down like soft fabric
+  gravity: -2400, // at the garments' size (Revision B) cloth drops with weight, yet the eye can follow it
   substeps: 16, // with travel 0.1 and the pile's 4.5 thickness, held cloth follows the pointer at up to 430 units/s
   maxStep: 1 / 30, // longer pauses (a hidden tab) are clamped
   travel: 0.1, // no particle, and no grip, moves more than this share of the thickness per substep
-  airDamping: 2.5, // per second: fabric meets a lot of air
+  airDamping: 1.2, // per second: fabric still meets some air
   wakeSpeed: 40, // cloth running into a sleeping garment this fast, or moving out from under it, disturbs it (units/s)
   wakeTouches: 3, // a sleeping garment wakes once this many moving particles disturb it in one frame
   sleepAfter: 0.4, // a garment sleeps when, over this many seconds,

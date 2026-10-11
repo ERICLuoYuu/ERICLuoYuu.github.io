@@ -383,3 +383,44 @@ test('the pack laid over the booklet and the books rests on them and hides the b
   assert.ok(over.length > 20, `${over.length} of the pack's particles lie over the dictionary`);
   over.forEach((i) => assert.ok(w.pos[3 * i + 2] >= top + FINE / 2 - 0.5, `z = ${w.pos[3 * i + 2]}`));
 });
+
+/** A 10 × 10 fine sheet turned 30° (so its particles cannot nest in the grid below), centred at (x, y), lowest at z. */
+function turnedSheet(x, y, z) {
+  const mesh = fine(10, 10);
+  const a = Math.PI / 6;
+  return Float32Array.from(mesh.rest, (v, k) => {
+    const i = k - (k % 3);
+    const [px, py] = [mesh.rest[i] - 30, mesh.rest[i + 1] - 30];
+    return [x + px * Math.cos(a) - py * Math.sin(a), y + px * Math.sin(a) + py * Math.cos(a), z][k % 3];
+  });
+}
+const fineWorld = (meshes) => createWorld({ garments: meshes.map((mesh) => ({ mesh, material })), bounds, thickness: FINE });
+
+test('let go 24 above the floor, a garment lands within 0.2 s: it has weight', () => {
+  const w = fineWorld([fine(10, 10)]);
+  setPositions(w, 0, turnedSheet(100, 100, 24));
+  let t = 0;
+  for (; t < 1 && Math.min(...zs(w)) > FINE / 2 + 0.5; t += 1 / 60) step(w, 1 / 60);
+  assert.ok(t <= 0.2 + 1e-9, `landed after ${t.toFixed(2)} s`);
+});
+
+test('dropped from the hold height onto a sleeping garment, it is asleep within 1.5 s', () => {
+  const w = fineWorld([fine(16, 16), fine(10, 10)]);
+  setPositions(w, 0, Float32Array.from(fine(16, 16).rest, (v, k) => v + [0, 0, FINE / 2][k % 3]));
+  setPositions(w, 1, turnedSheet(48, 48, FINE / 2 + FINE + 12));
+  sleep(w, 0);
+  let t = 0;
+  for (; t < 1.5 && !isSettled(w); t += 1 / 60) step(w, 1 / 60);
+  assert.ok(isSettled(w), `still moving after ${t.toFixed(2)} s`);
+  const top = zs(w).slice(w.offsets[1]);
+  assert.ok(Math.min(...top) > FINE, 'it lies on the lower sheet');
+});
+
+test('air drag is light: a falling garment keeps most of its speed', () => {
+  const w = fineWorld([fine(4, 4)]);
+  setPositions(w, 0, Float32Array.from(fine(4, 4).rest, (v, k) => v + [0, 0, 300][k % 3]));
+  const fall = (seconds) => 0.5 * -w.settings.gravity * seconds ** 2;
+  for (let f = 0; f < 6; f += 1) step(w, 1 / 60); // exactly 0.1 s: run() would take a seventh step
+  const dropped = 300 - Math.min(...zs(w));
+  assert.ok(dropped > 0.95 * fall(0.1), `fell ${dropped.toFixed(1)} of ${fall(0.1).toFixed(1)} units in 0.1 s`);
+});

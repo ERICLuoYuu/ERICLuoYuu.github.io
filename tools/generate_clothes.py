@@ -59,7 +59,7 @@ GARMENTS = [
     Garment("tee-white", "white T-shirt", (290, 250), material(2.5e-4, 0.6, 0.04, 1.2), (0.5, 0.04), tee_white),
     Garment("tee-breton", "striped top", (300, 260), material(2e-4, 0.6, 0.04, 1.2), (0.5, 0.03), tee_breton),
     Garment("slip-skirt", "satin slip skirt", (200, 272), material(6e-4, 0.3, 0.8, 0.6), (0.5, 0.95), slip_skirt),
-    Garment("ruched-top", "red ruched top", (220, 190), material(3e-4, 0.55, 0.12, 1.5), (0.5, 0.2), ruched_top),
+    Garment("ruched-top", "red ruched top", (220, 190), material(1.5e-4, 0.55, 0.12, 1.5), (0.5, 0.2), ruched_top),
     Garment("floral-skirt", "floral midi skirt", (230, 300), material(3e-4, 0.45, 0.08, 1.0), (0.5, 0.04), floral_skirt),
 ]
 

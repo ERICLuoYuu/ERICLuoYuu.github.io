@@ -4,7 +4,7 @@
  *   node tools/shots.mjs [base url] [output folder]
  *
  * Defaults: the local server (npm run serve) and ./shots (git-ignored). Also
- * saves a close-up of the vacuum pack.
+ * saves a close-up of the vacuum pack and, on the desktop, a garment held mid-drag.
  */
 import { mkdir } from 'node:fs/promises';
 import { chromium, devices } from '@playwright/test';
@@ -32,6 +32,30 @@ try {
       return drawn ?? document.querySelector('.pack-body').getBoundingClientRect().toJSON();
     });
     await page.screenshot({ path: `${out}/${name}-pack.png`, clip: padded({ x: packBox.left, y: packBox.top, width: packBox.width, height: packBox.height }) });
+    if (name === 'desktop') {
+      const grab = await page.evaluate(() => {
+        const box = document.querySelector('.book-top').getBoundingClientRect();
+        for (let j = 4; j <= 12; j += 1) {
+          for (let i = 4; i <= 12; i += 1) {
+            const x = box.left + (box.width * i) / 16;
+            const y = box.top + (box.height * j) / 16;
+            if (window.__parcel.pick(x, y)) return { x, y };
+          }
+        }
+        return null;
+      });
+      if (grab) {
+        await page.mouse.move(grab.x, grab.y);
+        await page.mouse.down();
+        for (let k = 1; k <= 20; k += 1) {
+          await page.mouse.move(grab.x - 4 * k, grab.y + 3 * k);
+          await page.waitForTimeout(16);
+        }
+        await page.waitForTimeout(400);
+        await page.screenshot({ path: `${out}/${name}-held.png` });
+        await page.mouse.up();
+      }
+    }
     console.log(`${out}/${name}-*.png`, JSON.stringify(await page.evaluate(() => window.__parcel.clothes())));
     await page.close();
   }

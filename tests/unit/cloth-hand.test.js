@@ -13,6 +13,8 @@ const RIM = BOX.height + BOX.longFlapLift;
 // the floor move with every layout and would sit under these test sheets.
 const walls = () => boxColliders().filter((c) => /^(wall|flap)-/.test(c.name));
 const sheet = (cols, rows) => buildMesh({ id: 'sheet', size: [cols * 10, rows * 10], grid: { cols, rows, cells: '1'.repeat(cols * rows) } });
+const FINE = 4.5; // the pile's thickness (tools/build-pile.mjs)
+const fine = (cols, rows) => buildMesh({ id: 'fine', size: [cols * 6, rows * 6], grid: { cols, rows, cells: '1'.repeat(cols * rows) } });
 /** Looking straight down: screen (sx, sy) is parcel (x, y). */
 const ray = (sx, sy) => ({ origin: [sx, sy, 3000], dir: [0, 0, -1] });
 
@@ -47,7 +49,8 @@ test('the hand lifts what it grabs and carries it under the pointer', () => {
   hand.dragTo(150, 150);
   const [x, y, z] = world.grip.to;
   assert.deepEqual([Math.round(x), Math.round(y)], [150, 150]);
-  assert.ok(z >= 60 && z >= world.pos[3 * i + 2] + 45, `held at ${z}`);
+  const below = world.pos[3 * i + 2];
+  assert.ok(z >= below + 12 && z < below + 18, `held at ${z}, just clear of the cloth at ${below}`);
 });
 
 test('carried over a wall, the hand rises above the rim at once', () => {
@@ -55,7 +58,7 @@ test('carried over a wall, the hand rises above the rim at once', () => {
   const i = topParticle(world, 0);
   hand.grab(hitAt(world, i), world.pos[3 * i], world.pos[3 * i + 1]);
   hand.dragTo(BOX.width + 4, 150);
-  assert.ok(world.grip.to[2] >= RIM + 45, `hand at ${world.grip.to[2]}`);
+  assert.ok(world.grip.to[2] >= RIM + 12, `hand at ${world.grip.to[2]}`);
 });
 
 test('letting go inside the box drops the garment where it is', () => {
@@ -74,6 +77,11 @@ const flapReach = (side) => {
   const [hinge, , tip] = flapCorners(side);
   return side === 'right' ? tip[0] - BOX.width : tip[1] - BOX.depth;
 };
+/** Lying on the table, flat or folded over on itself: nothing is left up on a flap or a wall. */
+const onTable = (world) => {
+  const top = Math.max(...world.pos.filter((_, k) => k % 3 === 2));
+  return top < 4 * THICKNESS;
+};
 
 test('letting go beyond the rim carries on past the flap, onto the table', () => {
   const { world, hand } = scene(370, 150);
@@ -88,9 +96,9 @@ test('letting go beyond the rim carries on past the flap, onto the table', () =>
   frames(world, hand, 240);
   assert.equal(hand.garment, null);
   for (let f = 0; f < 600 && !isSettled(world); f += 1) frames(world, hand, 1);
-  const [x, , z] = centroid(world, 0);
+  const [x] = centroid(world, 0);
   assert.ok(x > BOX.width + flapReach('right'), `came to rest at x ${x.toFixed(0)}, past the flap`);
-  assert.ok(z < THICKNESS, 'on the table');
+  assert.ok(onTable(world), 'on the table');
 });
 
 test('a keyboard move takes the garment beyond the nearest wall and lets go', async () => {
@@ -106,9 +114,9 @@ test('a keyboard move takes the garment beyond the nearest wall and lets go', as
   }
   assert.ok(done, 'the move finished');
   for (let f = 0; f < 600 && !isSettled(world); f += 1) frames(world, hand, 1);
-  const [x, , z] = centroid(world, 0);
+  const [x] = centroid(world, 0);
   assert.ok(x > BOX.width + flapReach('right'), `came to rest at x ${x.toFixed(0)}, past the flap`);
-  assert.ok(z < THICKNESS, 'on the table');
+  assert.ok(onTable(world), 'on the table');
 });
 
 test('aside means over the gentle right or front flap onto the table — never left over the pack, nor up the steep back flap', () => {
@@ -233,4 +241,61 @@ test('dragged by its middle, the pack flexes but keeps its shape', () => {
   };
   assert.ok(span(0) >= 0.9 * 181 && span(1) >= 0.9 * 290, `the pack spans ${span(0).toFixed(0)} × ${span(1).toFixed(0)}`);
   assert.ok(span(2) <= 12, `it rises ${span(2).toFixed(1)} at most: flexing, not folding`);
+});
+
+test('the hand holds a fingertip-sized patch: the grab point and its four nearest neighbours', () => {
+  const mesh = fine(10, 10);
+  const world = createWorld({
+    garments: [{ mesh, material: { stretchCompliance: 0, bendCompliance: 2e-4, friction: 0.5 } }],
+    bounds: { min: [-700, -600, 0], max: [1200, 1000, 700] },
+    thickness: FINE,
+  });
+  setPositions(world, 0, Float32Array.from(mesh.rest, (v, k) => v + [100, 100, FINE / 2][k % 3]));
+  sleepAll(world);
+  const hand = createHand({ world, colliders: [], ray });
+  const i = [...Array(mesh.count).keys()].find((v) => mesh.rest[3 * v] === 30 && mesh.rest[3 * v + 1] === 30);
+  hand.grab(hitAt(world, i), world.pos[3 * i], world.pos[3 * i + 1]);
+  assert.equal(world.grip.ids.length, 5, 'within 8 units: the particle and the four 6 units away');
+});
+
+test('held low, most of a garment stays spread out behind the hand', () => {
+  const mesh = fine(16, 16);
+  const world = createWorld({
+    garments: [{ mesh, material: { stretchCompliance: 0, bendCompliance: 2e-4, friction: 0.5 } }],
+    bounds: { min: [-700, -600, 0], max: [1200, 1000, 700] },
+    thickness: FINE,
+  });
+  setPositions(world, 0, Float32Array.from(mesh.rest, (v, k) => v + [100, 100, FINE / 2][k % 3]));
+  sleepAll(world);
+  const hand = createHand({ world, colliders: [], ray });
+  const edge = [...Array(mesh.count).keys()].find((v) => mesh.rest[3 * v] === 96 && mesh.rest[3 * v + 1] === 48);
+  hand.grab(hitAt(world, edge), world.pos[3 * edge], world.pos[3 * edge + 1]);
+  for (let f = 1; f <= 60; f += 1) {
+    hand.dragTo(196 + f, 148);
+    frames(world, hand, 1);
+  }
+  frames(world, hand, 30);
+  const xs = [...Array(world.count).keys()].map((j) => world.pos[3 * j]);
+  const span = Math.max(...xs) - Math.min(...xs);
+  assert.ok(span > 0.9 * 96, `the garment spans ${span.toFixed(0)} units along the pull (96 flat)`); // hung from 60 up: 72
+});
+
+test('carried off the pile onto bare floor, the hand sinks back to just clear of the floor', () => {
+  const [upper, lower] = [sheet(6, 6), sheet(6, 6)];
+  const world = createWorld({
+    garments: [upper, lower].map((mesh) => ({ mesh, material: { stretchCompliance: 0, bendCompliance: 2e-4, friction: 0.5 } })),
+    colliders: walls(),
+    bounds: { min: [-700, -600, 0], max: [1200, 1000, 700] },
+    thickness: THICKNESS,
+  });
+  setPositions(world, 0, Float32Array.from(upper.rest, (v, k) => v + [200, 120, 1.5 * THICKNESS][k % 3]));
+  setPositions(world, 1, Float32Array.from(lower.rest, (v, k) => v + [200, 120, THICKNESS / 2][k % 3]));
+  sleepAll(world);
+  const hand = createHand({ world, colliders: walls(), ray });
+  const i = topParticle(world, 0);
+  hand.grab(hitAt(world, i), world.pos[3 * i], world.pos[3 * i + 1]);
+  hand.dragTo(100, 150); // off the pile, over bare floor
+  frames(world, hand, 90);
+  // resting on the floor a particle lies THICKNESS / 2 up; the hand holds it 12 above that, not 12 above where it was picked up
+  assert.ok(world.grip.to[2] < THICKNESS / 2 + 12 + 1, `held at ${world.grip.to[2].toFixed(1)} over the floor`);
 });
