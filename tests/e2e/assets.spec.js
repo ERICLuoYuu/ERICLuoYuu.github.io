@@ -24,7 +24,6 @@ test('the vacuum pack and the desiccant packet lie on the box floor', async ({ p
   expect(pack.src).toContain('assets/photo/vacuum-pack.webp');
   expect(pack.ok).toBe(true);
   expect((await loaded('.pack-shade')).ok).toBe(true);
-  expect(await page.$eval('.pack-edge', (el) => getComputedStyle(el).backgroundImage)).toContain('vacuum-pack.webp');
   await expect(page.locator('.photo-card')).toHaveCount(0);
   const packet = await loaded('.desiccant');
   expect(packet.src).toContain('assets/art/desiccant.webp');

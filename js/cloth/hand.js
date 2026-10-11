@@ -79,7 +79,7 @@ export function dropAt(world, colliders, g, [x, y]) {
 export function createHand({ world, colliders, ray }) {
   let held = null; // { garment, base, height, want, xy, sx, sy, script }
 
-  const wantAt = (x, y) => Math.max(held.base, supportHeight(world, colliders, x, y, { skip: held.garment }) + LIFT);
+  const wantAt = (x, y) => Math.max(held.base, supportHeight(world, colliders, x, y, { skip: held.garment, moving: false }) + LIFT);
 
   /** Move the hand to (x, y) at its height, rising first if something below is taller. */
   function place([x, y]) {

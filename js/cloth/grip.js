@@ -35,14 +35,17 @@ function boxTop({ center, axes, half }, x, y, reach) {
 /**
  * Height the hand must clear at (x, y): the highest collider top or cloth
  * surface within `reach`, or 0 for the floor and the table. Cloth of
- * garment `skip` (the one being held) does not count.
+ * garment `skip` (the one being held) does not count. With `moving: false`
+ * neither does cloth that is awake: cloth lying on the held garment comes up
+ * with it, and counted, it would lift the hand that lifts it, without end.
  */
-export function supportHeight(world, colliders, x, y, { reach = 20, skip = -1 } = {}) {
+export function supportHeight(world, colliders, x, y, { reach = 20, skip = -1, moving = true } = {}) {
   let top = 0;
   colliders.forEach((box) => { top = Math.max(top, boxTop(box, x, y, reach)); });
-  const { pos, garmentOf, thickness } = world;
+  const { pos, garmentOf, thickness, awake } = world;
   for (let i = 0; i < world.count; i += 1) {
-    if (garmentOf[i] === skip) continue;
+    const g = garmentOf[i];
+    if (g === skip || (!moving && awake[g])) continue;
     if (Math.abs(pos[3 * i] - x) <= reach && Math.abs(pos[3 * i + 1] - y) <= reach) {
       top = Math.max(top, pos[3 * i + 2] + thickness);
     }

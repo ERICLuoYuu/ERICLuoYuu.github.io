@@ -149,11 +149,14 @@ test.describe('clothes in the box (desktop)', () => {
   test('a garment taken out of the box with the mouse no longer has a keyboard button', async ({ page }) => {
     await openSite(page, '?jump=overhead');
     await waitForState(page, 'overhead');
-    const before = await shownKeys(page).count();
     const point = await pointOn(page);
     await dragMouse(page, point, { x: point.x, y: page.viewportSize().height - 4 });
     await waitForSettled(page);
-    await expect(shownKeys(page)).toHaveCount(before - 1);
+    // cloth lying on the garment may come out with it: every garment out of the box loses its button
+    const inBox = ([x, y]) => x > 0 && x < 420 && y > 0 && y < 300;
+    const { garments } = await clothesOf(page);
+    expect(inBox(garments.find((g) => g.id === point.id).centre)).toBe(false);
+    await expect(shownKeys(page)).toHaveCount(garments.filter((g) => inBox(g.centre)).length);
   });
 
   test('losing the graphics mid-move does not jam the keyboard moves', async ({ page }) => {

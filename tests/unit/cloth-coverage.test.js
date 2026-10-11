@@ -32,7 +32,8 @@ test('a sheet lying over the whole booklet covers it', () => {
 });
 
 test('a sheet over the left half covers about half', () => {
-  const half = bookCoverage(sheetAt(book.x - 100, -20, top + 5, 180, 300), book); // reaches 80 of the 164 units
+  // reaches 40 of the booklet's 96 units; the 9-unit sampling radius takes it to about half
+  const half = bookCoverage(sheetAt(book.x + 40 - 200, -20, top + 5, 200, 300), book);
   assert.ok(half > 0.4 && half < 0.6, `coverage ${half}`);
 });
 

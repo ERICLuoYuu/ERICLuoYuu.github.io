@@ -301,7 +301,6 @@ async function start() {
   document.documentElement.style.setProperty('--art-endpaper', cssUrl(resolved.endpaper));
   scene.pack.img.src = resolved.photo;
   scene.pack.img.alt = config.photo.alt;
-  scene.pack.el.style.setProperty('--pack-src', cssUrl(resolved.photo));
   if (resolved.photoShade) scene.pack.shade.src = resolved.photoShade;
   else scene.pack.shade.hidden = true;
   scene.questionImg.src = resolved.questionMark;

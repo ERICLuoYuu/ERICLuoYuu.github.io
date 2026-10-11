@@ -178,7 +178,7 @@ body[data-state="dark"] .floor-glow { opacity: 1; }
 /* ─── contents ─────────────────────────────────────────────────────────── */
 .contents { position: absolute; inset: 0; transform-style: preserve-3d; }
 
-/* The owner's vacuum pack: a flat body, its seal edge curling up the left wall. */
+/* The owner's vacuum pack, lying flat along the left wall. */
 .pack {
   position: absolute;
   transform-style: preserve-3d;
@@ -192,29 +192,7 @@ body[data-state="dark"] .floor-glow { opacity: 1; }
      alpha shapes it: the clear film casts a faint shadow, the contents a firm one. */
   filter: drop-shadow(2px 3px 2.5px rgba(30, 18, 8, .42)) brightness(calc(1 - (1 - var(--light, 1)) * .95));
 }
-.pack-img, .pack-shade {
-  position: absolute; top: 0; left: calc(-1 * var(--edge));
-  width: var(--full); height: 100%;
-  clip-path: inset(0 0 0 var(--edge)); /* the first `edge` pixels are the curled-up strip */
-}
-.pack-edge {
-  position: absolute; top: 0; left: calc(-1 * var(--edge));
-  width: var(--edge); height: 100%;
-  background: var(--pack-src, none) 0 0 / var(--full) 100% no-repeat;
-  transform-origin: 100% 50%;
-  transform: translateZ(var(--thick)) rotateY(var(--tilt));
-  /* turned toward the wall, the strip catches a little less light */
-  filter: brightness(calc(.9 * (1 - (1 - var(--light, 1)) * .95)));
-}
-.pack-joint {
-  /* soft contact shadow along the floor where the pack meets the wall */
-  position: absolute; top: 3px; bottom: 3px;
-  left: calc(-1 * var(--reach)); width: calc(var(--reach) + 12px);
-  transform: translateZ(.3px);
-  background: linear-gradient(90deg, rgba(30, 18, 8, .5), rgba(30, 18, 8, .18) 45%, rgba(30, 18, 8, 0));
-  filter: blur(1.5px);
-  opacity: var(--light, 1);
-}
+.pack-img, .pack-shade { position: absolute; inset: 0; width: 100%; height: 100%; }
 .desiccant {
   position: absolute;
   transform: translateZ(1.2px) rotate(var(--rot));

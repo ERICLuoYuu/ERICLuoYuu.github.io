@@ -301,3 +301,14 @@ test('cloth dropped on the vacuum pack rests on top of it', () => {
   run(w, 2);
   zs(w).forEach((z) => assert.ok(z >= thickness + THICKNESS / 2 - 0.5, `z = ${z}`));
 });
+
+test("at the pile's thickness, a held garment keeps up with a pointer moving 430 units a second", () => {
+  const mesh = sheet(4, 4);
+  const w = createWorld({ garments: [{ mesh, material }], bounds, thickness: 4.5 });
+  grab(w, 0, [0], [0, 0, 20]);
+  for (let f = 1; f <= 30; f += 1) {
+    moveGrip(w, [(430 * f) / 60, 0, 20]);
+    step(w, 1 / 60);
+  }
+  assert.ok(Math.abs(w.grip.from[0] - 215) < 1, `the hand is at x = ${w.grip.from[0].toFixed(1)}, the pointer at 215`);
+});

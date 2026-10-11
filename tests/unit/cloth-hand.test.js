@@ -6,7 +6,7 @@ import { boxColliders, flapCorners } from '../../js/scene/solids.js';
 import { BOX } from '../../js/scene/geometry.js';
 import { createHand, asideTarget, topParticle, dropAt } from '../../js/cloth/hand.js';
 
-const THICKNESS = 7.5;
+const THICKNESS = 4.5; // the pile's thickness (tools/build-pile.mjs)
 const RIM = BOX.height + BOX.longFlapLift;
 const sheet = (cols, rows) => buildMesh({ id: 'sheet', size: [cols * 10, rows * 10], grid: { cols, rows, cells: '1'.repeat(cols * rows) } });
 /** Looking straight down: screen (sx, sy) is parcel (x, y). */
@@ -139,4 +139,28 @@ test('grabbing again or dropping lets go of the previous garment cleanly', () =>
   hand.drop();
   assert.equal(world.grip, null);
   assert.ok(world.invMass.every((w) => w === 1), 'no particle left pinned');
+});
+
+test('cloth carried along on the held garment does not lift the hand ever higher', () => {
+  const lower = sheet(6, 6);
+  const rider = sheet(2, 2);
+  const world = createWorld({
+    garments: [lower, rider].map((mesh) => ({ mesh, material: { stretchCompliance: 0, bendCompliance: 2e-4, friction: 0.5 } })),
+    colliders: boxColliders(),
+    bounds: { min: [-700, -600, 0], max: [1200, 1000, 700] },
+    thickness: THICKNESS,
+  });
+  setPositions(world, 0, Float32Array.from(lower.rest, (v, i) => v + [200, 120, THICKNESS / 2][i % 3]));
+  setPositions(world, 1, Float32Array.from(rider.rest, (v, i) => v + [-1000, 0, THICKNESS / 2][i % 3]));
+  sleepAll(world);
+  const hand = createHand({ world, colliders: boxColliders(), ray });
+  const i = topParticle(world, 0);
+  hand.grab(hitAt(world, i), world.pos[3 * i], world.pos[3 * i + 1]);
+  for (let f = 0; f < 60; f += 1) {
+    // cloth lying on the held garment comes up with it, just under the hand
+    const [x, y, z] = world.grip.from;
+    setPositions(world, 1, Float32Array.from(rider.rest, (v, k) => v + [x - 10, y - 10, z - 10][k % 3]));
+    frames(world, hand, 1);
+  }
+  assert.ok(world.grip.to[2] < 80, `the hand rose to ${world.grip.to[2].toFixed(0)}`);
 });

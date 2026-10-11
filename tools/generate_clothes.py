@@ -4,7 +4,7 @@
 
 Draws each garment as a flat-lay illustration (assets/clothes/<id>.webp, with
 transparency around it) and writes assets/clothes/garments.json: its size in
-parcel units, the coverage grid the cloth mesh is built from, and how the
+parcel units (fitted to the figure in the owner's pack), the coverage grid the cloth mesh is built from, and how the
 fabric behaves. Then run `node tools/build-pile.mjs` to settle the pile.
 
 The traditional pieces are a qipao, a mandarin-collar blouse and a horse-face
@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import math
 import random
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
@@ -24,11 +25,13 @@ from typing import Callable
 import numpy as np
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # run as a script: make `clothes` importable
+from clothes.fit import CELL, cell_grid, fit, grid_shape  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "assets" / "clothes"
 
-SPACING = 10  # parcel units between cloth particles
-PX = 2.4  # texture pixels per parcel unit
+PX = 2.4  # texture pixels per pattern unit
 SS = 2  # supersampling while drawing
 S = PX * SS  # drawing pixels per unit
 COVER = 0.3  # a grid cell is cloth when at least this share of it is opaque
@@ -161,23 +164,11 @@ class Canvas:
         shade.putalpha(inv.point(lambda v: v * strength // 255))
         self.paint(shade)
 
-    def finish(self, path: Path) -> tuple[Image.Image, dict]:
+    def finish(self, path: Path, cols: int, rows: int) -> tuple[Image.Image, dict]:
         final = self.image.resize((round(self.w * PX), round(self.h * PX)), Image.LANCZOS)
         final.save(path, "WEBP", quality=82, method=6)
-        return final, coverage_grid(final, self.w, self.h)
-
-
-def coverage_grid(image: Image.Image, width: int, height: int) -> dict:
-    cols, rows = math.ceil(width / SPACING), math.ceil(height / SPACING)
-    alpha = np.asarray(image.getchannel("A"), dtype=np.float32) / 255
-    cells = []
-    for j in range(rows):
-        for i in range(cols):
-            x0, x1 = round(i * SPACING * PX), round(min(width, (i + 1) * SPACING) * PX)
-            y0, y1 = round(j * SPACING * PX), round(min(height, (j + 1) * SPACING) * PX)
-            block = alpha[y0:y1, x0:x1]
-            cells.append("1" if block.size and block.mean() >= COVER else "0")
-    return {"cols": cols, "rows": rows, "cells": "".join(cells)}
+        alpha = np.asarray(final.getchannel("A"), dtype=np.float32) / 255
+        return final, cell_grid(alpha, cols, rows, cloth=COVER)
 
 
 # ─── motifs ───────────────────────────────────────────────────────────────────
@@ -447,21 +438,24 @@ def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     records = []
     for g in GARMENTS:
+        scale = fit(g.id, g.size[1])
+        size = [round(g.size[0] * scale, 2), round(g.size[1] * scale, 2)]
         canvas = Canvas(*g.size, seed=f"garment:{g.id}")
         g.draw(canvas)
         path = OUT / f"{g.id}.webp"
-        image, grid = canvas.finish(path)
+        image, grid = canvas.finish(path, *grid_shape(*size))
         records.append({
             "id": g.id,
             "label": g.label,
             "texture": path.relative_to(ROOT).as_posix(),
-            "size": list(g.size),
+            "pxPerUnit": round(PX / scale, 4),
+            "size": size,
             "grid": grid,
             "material": g.material,
         })
         covered = grid["cells"].count("1") / len(grid["cells"])
         print(f"{g.id:13s} {image.width}x{image.height}px  {path.stat().st_size // 1024:3d} KB  cloth cells {covered:.0%}")
-    data = {"spacing": SPACING, "pxPerUnit": PX, "garments": records}
+    data = {"spacing": CELL, "pxPerUnit": PX, "garments": records}
     (OUT / "garments.json").write_text(json.dumps(data, indent=1) + "\n", encoding="utf-8", newline="\n")
 
 

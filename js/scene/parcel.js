@@ -59,18 +59,16 @@ function buildFlap(side) {
   return { flap, tapeSvg };
 }
 
-/** The owner's vacuum pack: a flat body on the floor, its seal edge curling up the left wall. */
+/** The owner's vacuum pack, lying flat along the left wall. */
 function buildPack() {
-  const { x, y, width, height, thickness, rotate, edge, tilt } = CONTENTS.pack;
-  const reach = edge * Math.cos((tilt * Math.PI) / 180);
+  const { x, y, width, height, thickness, rotate } = CONTENTS.pack;
   const pack = h('div', 'pack');
-  pack.style.cssText = `left:${x}px;top:${y}px;width:${width}px;height:${height}px;--rot:${rotate}deg;`
-    + `--edge:${edge}px;--full:${width + edge}px;--tilt:${tilt}deg;--thick:${thickness}px;--reach:${reach.toFixed(2)}px`;
+  pack.style.cssText = `left:${x}px;top:${y}px;width:${width}px;height:${height}px;--rot:${rotate}deg;--thick:${thickness}px`;
   const img = h('img', 'pack-img', { alt: '', draggable: 'false' });
   const shade = h('img', 'pack-shade', { alt: '', draggable: 'false', 'aria-hidden': 'true' });
   const body = h('div', 'pack-body');
   body.append(img, shade);
-  pack.append(h('div', 'pack-joint', { 'aria-hidden': 'true' }), body, h('div', 'pack-edge', { 'aria-hidden': 'true' }));
+  pack.append(body);
   return { el: pack, img, shade };
 }
 

@@ -59,14 +59,20 @@ test('pack, booklet and desiccant lie inside the walls without overlapping', () 
     assert.ok(b.left >= inner.left && b.right <= inner.right, 'inside the side walls');
     assert.ok(b.top >= inner.top && b.bottom <= inner.bottom, 'inside the front and back walls');
   });
-  assert.ok(pack.right < book.left, 'the pack stays clear of the booklet');
-  assert.ok(CONTENTS.pack.x + CONTENTS.pack.width / 2 < BOX.width / 2, 'the pack is on the left');
-  assert.ok(desiccant.left > BOX.width * 0.75 && desiccant.top > BOX.depth * 0.6, 'the desiccant sits in the front-right corner');
+  assert.ok(pack.right < book.left && pack.right < desiccant.left, 'the pack stays clear of the rest');
 });
 
-test("the pack's seal edge curls up to rest on the left wall", () => {
-  const { x, edge, tilt, rotate } = CONTENTS.pack;
-  assert.equal(rotate, 0, 'square to the wall, so the whole edge touches it');
-  const reach = x - edge * Math.cos((tilt * Math.PI) / 180);
-  assert.ok(Math.abs(reach - 2) < 0.5, `the edge's top lies at x = ${reach}; the wall's inner face is at 2`);
+test('the pack lies square along the left wall, the full depth of the box', () => {
+  const { x, y, width, height, rotate } = CONTENTS.pack;
+  assert.equal(rotate, 0);
+  assert.ok(x - 2 <= 6, `${x - 2} units from the left wall`);
+  assert.ok(y >= 2 && y + height <= BOX.depth - 2, 'between the back and front walls');
+  assert.ok(height >= 0.95 * (BOX.depth - 4), `${height} of ${BOX.depth - 4} units deep`);
+  assert.ok(Math.abs(width / height - 747 / 1200) < 0.01, 'the picture keeps its proportions (747 × 1200)');
+});
+
+test('the booklet lies in the upper right, where the pile goes', () => {
+  const book = footprint(CONTENTS.book);
+  assert.ok(book.left >= 195 && book.bottom <= 165, `booklet from x ${book.left.toFixed(0)}, down to y ${book.bottom.toFixed(0)}`);
+  assert.deepEqual([CONTENTS.book.width, CONTENTS.book.height], [96, 134], 'the old booklet, smaller, same proportions');
 });

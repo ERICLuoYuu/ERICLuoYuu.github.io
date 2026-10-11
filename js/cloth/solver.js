@@ -17,7 +17,7 @@ import { collideBox, collidePair, collidePlane, prepareCollider } from './collid
 
 export const DEFAULTS = Object.freeze({
   gravity: -2400, // lighter than real gravity: garments drift down like soft fabric
-  substeps: 10,
+  substeps: 16, // with travel 0.1 and the pile's 4.5 thickness, held cloth follows the pointer at up to 430 units/s
   maxStep: 1 / 30, // longer pauses (a hidden tab) are clamped
   travel: 0.1, // no particle, and no grip, moves more than this share of the thickness per substep
   airDamping: 2.5, // per second: fabric meets a lot of air

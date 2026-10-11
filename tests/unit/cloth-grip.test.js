@@ -10,7 +10,7 @@ const near = (a, b, eps = 0.5) => Math.abs(a - b) <= eps;
 
 test('nothing to clear over the open floor or the table', () => {
   // between the pack and the booklet, more than the hand's reach from either
-  assert.equal(supportHeight(noCloth, colliders, 165, 150), 0);
+  assert.equal(supportHeight(noCloth, colliders, 220, 60), 0);
   assert.equal(supportHeight(noCloth, colliders, -500, -500), 0);
 });
 
@@ -42,10 +42,18 @@ test('over an open flap, the flap surface at that spot', () => {
 });
 
 test('other cloth underneath counts; the held garment itself does not', () => {
-  const world = { count: 2, pos: new Float32Array([165, 150, 40, 168, 150, 90]), garmentOf: new Uint16Array([0, 1]), thickness: 7.5 };
-  assert.ok(near(supportHeight(world, colliders, 165, 150), 90 + 7.5));
-  assert.ok(near(supportHeight(world, colliders, 165, 150, { skip: 1 }), 40 + 7.5));
-  assert.equal(supportHeight(world, colliders, 165, 210), 0, 'too far away to matter');
+  const world = { count: 2, pos: new Float32Array([220, 60, 40, 223, 60, 90]), garmentOf: new Uint16Array([0, 1]), thickness: 7.5 };
+  assert.ok(near(supportHeight(world, colliders, 220, 60), 90 + 7.5));
+  assert.ok(near(supportHeight(world, colliders, 220, 60, { skip: 1 }), 40 + 7.5));
+  assert.equal(supportHeight(world, colliders, 220, 120), 0, 'too far away to matter');
+});
+
+test('moving cloth can be left out: carried on the held garment, it would lift the hand that lifts it', () => {
+  const world = {
+    count: 2, pos: new Float32Array([220, 60, 40, 223, 60, 90]), garmentOf: new Uint16Array([0, 1]), thickness: 7.5, awake: new Uint8Array([0, 1]),
+  };
+  assert.ok(near(supportHeight(world, colliders, 220, 60, { moving: false }), 40 + 7.5), 'only the resting cloth');
+  assert.ok(near(supportHeight(world, colliders, 220, 60), 90 + 7.5), 'by default everything counts');
 });
 
 test('the grip holds the particles of the hit garment close to the hit point', () => {

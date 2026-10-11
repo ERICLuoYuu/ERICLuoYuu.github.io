@@ -5,7 +5,8 @@
  *   node tools/build-pile.mjs        (npm run clothes runs it after the art)
  *
  * Each garment is laid out flat, folded a little (sleeves in, halves over),
- * turned and dropped onto the booklet with the same solver the site uses.
+ * turned and dropped onto the booklet in the upper right with the same
+ * solver the site uses.
  * The result goes to assets/clothes/pile.json. If the pile does not hide the
  * booklet or covers too much of the pack, the next random seed is tried.
  */
@@ -18,27 +19,30 @@ import { boxColliders } from '../js/scene/solids.js';
 import { BOX, CONTENTS } from '../js/scene/geometry.js';
 
 const ROOT = new URL('../', import.meta.url);
-const THICKNESS = 7.5; // spacing 10: covers the 7.1-unit gap in the middle of a cell
+const THICKNESS = 4.5; // cells of at most 6: covers the 4.2-unit gap in the middle of a cell
 const BOUNDS = { min: [-900, -900, 0], max: [1300, 1300, 900] };
 // Where particle centres may be laid: the walls are 2 thick, plus a particle radius and a little air.
 const INSIDE = { min: [8, 8], max: [BOX.width - 8, BOX.depth - 8] };
 const PARKED_X = -3000; // garments wait far away until it is their turn
 const TARGETS = { book: 0.88, pack: 0.2 };
+const JITTER = { turn: 16, shift: 6 }; // degrees and units of random variation per seed
+const DROP_GAP = 12; // each garment is dropped this far above the pile so far
 
 /**
- * Bottom to top. fold: [axis, at, keep] — fold everything on the far side of
- * the line axis = at back over the near side ('x' folds left/right, 'y' up/down;
- * keep 'low' keeps the side below `at`). turn in degrees, centre in parcel units.
+ * Bottom to top, over the booklet in the upper right. fold: [axis, at, keep]
+ * folds everything beyond the line axis = at — a share of the garment's
+ * width for 'x', of its length for 'y' — back over the near side; keep
+ * 'low' keeps the side below `at`. turn in degrees, centre in parcel units.
  */
 const PLAN = [
-  { id: 'mamianqun', folds: [['x', 140, 'low']], turn: 84, centre: [292, 188] },
-  { id: 'tee-breton', folds: [['x', 72, 'high'], ['x', 228, 'low']], turn: -8, centre: [280, 104] },
-  { id: 'slip-skirt', folds: [['y', 150, 'low']], turn: 100, centre: [318, 196] },
-  { id: 'qipao', folds: [['y', 200, 'low']], turn: 70, centre: [268, 142] },
-  { id: 'tee-white', folds: [['x', 70, 'high'], ['x', 220, 'low']], turn: 18, centre: [298, 118] },
-  { id: 'blouse', folds: [['x', 82, 'high'], ['x', 218, 'low']], turn: -24, centre: [262, 196] },
-  { id: 'floral-skirt', folds: [['y', 150, 'low']], turn: -66, centre: [338, 146] },
-  { id: 'ruched-top', folds: [], turn: 28, centre: [248, 118] },
+  { id: 'mamianqun', folds: [['x', 0.5, 'low']], turn: 84, centre: [306, 101] },
+  { id: 'tee-breton', folds: [['x', 0.24, 'high'], ['x', 0.76, 'low']], turn: -8, centre: [300, 59] },
+  { id: 'slip-skirt', folds: [['y', 0.55, 'low']], turn: 100, centre: [319, 105] },
+  { id: 'qipao', folds: [['y', 0.5, 'low']], turn: 70, centre: [294, 78] },
+  { id: 'tee-white', folds: [['x', 0.24, 'high'], ['x', 0.76, 'low']], turn: 18, centre: [309, 66] },
+  { id: 'blouse', folds: [['x', 0.27, 'high'], ['x', 0.73, 'low']], turn: -24, centre: [291, 105] },
+  { id: 'floral-skirt', folds: [['y', 0.5, 'low']], turn: -66, centre: [329, 80] },
+  { id: 'ruched-top', folds: [], turn: 28, centre: [284, 66] },
 ];
 
 /** Small seeded random numbers (mulberry32). */
@@ -53,15 +57,16 @@ function random(seed) {
   };
 }
 
-/** Fold flat positions over a line; the folded part lies one layer higher. */
-function fold(positions, [axis, at, keep]) {
+/** Fold flat positions over a line (see PLAN); the folded part lies one layer higher. */
+function fold(positions, [axis, at, keep], size) {
   const k = axis === 'x' ? 0 : 1;
+  const line = at * size[k];
   const out = Float32Array.from(positions);
   for (let i = 0; i < out.length; i += 3) {
     const v = out[i + k];
-    const far = keep === 'low' ? v > at : v < at;
+    const far = keep === 'low' ? v > line : v < line;
     if (far) {
-      out[i + k] = 2 * at - v;
+      out[i + k] = 2 * line - v;
       out[i + 2] += THICKNESS;
     }
   }
@@ -69,12 +74,12 @@ function fold(positions, [axis, at, keep]) {
 }
 
 /** Fold, turn about the middle, move to `centre`, lift to `height`. */
-function lay(mesh, { folds, turn, centre }, height, rand) {
-  const folded = folds.reduce(fold, mesh.rest);
+function lay(mesh, { folds, turn, centre }, height, rand, size) {
+  const folded = folds.reduce((positions, f) => fold(positions, f, size), mesh.rest);
   const count = folded.length / 3;
   const mid = [0, 1].map((k) => folded.filter((_, i) => i % 3 === k).reduce((a, b) => a + b, 0) / count);
-  const angle = ((turn + (rand() - 0.5) * 16) * Math.PI) / 180;
-  const shift = [centre[0] + (rand() - 0.5) * 20, centre[1] + (rand() - 0.5) * 20];
+  const angle = ((turn + (rand() - 0.5) * JITTER.turn) * Math.PI) / 180;
+  const shift = [centre[0] + (rand() - 0.5) * JITTER.shift, centre[1] + (rand() - 0.5) * JITTER.shift];
   const out = new Float32Array(folded.length);
   for (let i = 0; i < folded.length; i += 3) {
     const x = folded[i] - mid[0];
@@ -143,7 +148,7 @@ function buildPile(garments, seed) {
   });
   PLAN.forEach((placement) => {
     const g = garments.findIndex((garment) => garment.id === placement.id);
-    setPositions(world, g, fitInside(lay(meshes[g], placement, highestPoint(world) + 24, rand)));
+    setPositions(world, g, fitInside(lay(meshes[g], placement, highestPoint(world) + DROP_GAP, rand, garments[g].size)));
     if (!settle(world, 8)) console.warn(`  ${placement.id} was still moving after 8 s; it is put to sleep where it is`);
   });
   world.counts.forEach((_, g) => { if (world.awake[g]) sleep(world, g); });

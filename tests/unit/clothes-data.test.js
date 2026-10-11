@@ -7,10 +7,14 @@ const ROOT = new URL('../../', import.meta.url);
 const readJson = async (path) => JSON.parse(await readFile(new URL(path, ROOT), 'utf8'));
 
 const EXPECTED = ['qipao', 'blouse', 'mamianqun', 'tee-white', 'tee-breton', 'slip-skirt', 'ruched-top', 'floral-skirt'];
+// How long each garment is on the figure in the pack (spec Revision B, B2), in parcel units.
+const LENGTH = {
+  qipao: 158, blouse: 83, mamianqun: 127, 'tee-white': 83, 'tee-breton': 83, 'slip-skirt': 103, 'ruched-top': 55, 'floral-skirt': 103,
+};
 
 test('garments.json lists the eight garments with textures, grids and materials', async () => {
   const data = await readJson('assets/clothes/garments.json');
-  assert.equal(data.spacing, 10);
+  assert.equal(data.spacing, 6);
   assert.deepEqual(data.garments.map((g) => g.id), EXPECTED);
   await Promise.all(data.garments.map(async (g) => {
     const { size } = await stat(new URL(g.texture, ROOT));
@@ -22,7 +26,7 @@ test('garments.json lists the eight garments with textures, grids and materials'
     assert.ok(covered > 0.4, `${g.id} is mostly cloth (${covered.toFixed(2)})`);
     assert.doesNotMatch(`${g.id} ${g.label}`, /zara|h&m|mango|ikea/i);
     ['stretchCompliance', 'bendCompliance', 'friction', 'sheen'].forEach((k) => assert.ok(Number.isFinite(g.material[k]), `${g.id}.${k}`));
-    assert.ok(buildMesh(g).count > 100, `${g.id} has a usable mesh`);
+    assert.ok(buildMesh(g).count > 60, `${g.id} has a usable mesh`); // the cropped ruched top: about 100
   }));
 });
 
@@ -54,4 +58,21 @@ test('pile.json is a settled pile that hides the booklet and leaves the pack in 
   });
   assert.ok(bookCoverage(world, CONTENTS.book) >= 0.85, 'the booklet is hidden');
   assert.ok(bookCoverage(world, CONTENTS.pack) <= 0.25, 'the pack stays mostly visible');
+});
+
+test('every garment fits the figure in the pack', async () => {
+  const data = await readJson('assets/clothes/garments.json');
+  data.garments.filter((g) => g.kind !== 'film').forEach((g) => {
+    const target = LENGTH[g.id];
+    assert.ok(Math.abs(g.size[1] - target) <= 0.1 * target, `${g.id}: ${g.size[1]} long, the figure wants ${target}`);
+    assert.ok(Number.isFinite(g.pxPerUnit) && g.pxPerUnit > 0, `${g.id}.pxPerUnit`);
+  });
+});
+
+test('simulating everything at once costs no more than the spec allows', async () => {
+  const { DEFAULTS } = await import('../../js/cloth/solver.js');
+  const data = await readJson('assets/clothes/garments.json');
+  const particles = data.garments.map(buildMesh).reduce((sum, m) => sum + m.count, 0);
+  // spec B3: within 10 % of 5,000 particles × 10 substeps
+  assert.ok(particles * DEFAULTS.substeps <= 55000, `${particles} particles × ${DEFAULTS.substeps} substeps`);
 });
