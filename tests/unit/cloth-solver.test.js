@@ -205,3 +205,38 @@ test('cloth dragged hard into a sleeping garment wakes it', () => {
   }
   assert.equal(w.awake[0], 1);
 });
+
+/** A sheet laid flat on a board tilted by `deg` about the y axis; returns the world and the board's down-slope axis. */
+function onSlope(deg) {
+  const a = (deg * Math.PI) / 180;
+  const along = [Math.cos(a), 0, Math.sin(a)];
+  const normal = [-Math.sin(a), 0, Math.cos(a)];
+  const board = { kind: 'obb', name: 'board', center: [30, 30, 80], axes: [along, [0, 1, 0], normal], half: [90, 90, 1] };
+  const w = world({ colliders: [board] });
+  const lift = 1 + THICKNESS / 2 + 0.3;
+  const laid = Float32Array.from(w.pos);
+  for (let i = 0; i < w.count; i += 1) {
+    const u = w.pos[3 * i] - 30;
+    const v = w.pos[3 * i + 1] - 30;
+    [0, 1, 2].forEach((k) => { laid[3 * i + k] = board.center[k] + along[k] * u + (k === 1 ? v : 0) + normal[k] * lift; });
+  }
+  setPositions(w, 0, laid);
+  return { w, down: along.map((c) => -c) };
+}
+
+test('cloth dropped on a flap-like 24° slope of cardboard stays put', () => {
+  const { w, down } = onSlope(24);
+  const before = centroid(w, 0);
+  run(w, 3);
+  const slid = centroid(w, 0).reduce((sum, c, k) => sum + (c - before[k]) * down[k], 0);
+  assert.ok(slid < 3, `slid ${slid.toFixed(1)} units down the slope`);
+  assert.ok(isSettled(w));
+});
+
+test('on a steep 45° slope cloth still slides off', () => {
+  const { w, down } = onSlope(45);
+  const before = centroid(w, 0);
+  run(w, 1.5);
+  const slid = centroid(w, 0).reduce((sum, c, k) => sum + (c - before[k]) * down[k], 0);
+  assert.ok(slid > 30, `slid ${slid.toFixed(1)} units down the slope`);
+});

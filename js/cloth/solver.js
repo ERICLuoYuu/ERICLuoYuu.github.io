@@ -27,7 +27,7 @@ export const DEFAULTS = Object.freeze({
   sleepDrift: 1.5, // nearly all of its particles moved less than this...
   restlessShare: 0.05, // ...where "nearly all" allows this share of stray, buzzing particles
   contactFriction: 0.25, // cloth on cloth
-  contactDamping: 0.8, // share of speed a touching particle keeps per substep: calms crumpled heaps
+  contactDamping: 0.98, // share of speed a touching particle keeps per substep: a little calm for crumpled heaps
 });
 
 /** How far apart two particles may start a frame and still meet during it. */

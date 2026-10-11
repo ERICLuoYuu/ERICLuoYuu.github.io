@@ -18,6 +18,33 @@ export function prepareCollider({ name, center, axes, half }) {
   return { name, center, axes, half, radius: Math.hypot(...half) };
 }
 
+const STATIC_RATIO = 1.3; // static friction is this much stronger than sliding friction
+
+/**
+ * Coulomb friction for a contact that just pushed particle i out by `depth`
+ * along the unit normal (nx, ny, nz). Sliding this substep that is small
+ * next to the push stops dead (static friction: fabric stays on a sloping
+ * flap); faster sliding loses at most `kinetic × depth` (it slides on, and
+ * slows the way real cloth does).
+ */
+function rub(pos, prev, i, nx, ny, nz, depth, kinetic) {
+  const v = 3 * i;
+  const mx = pos[v] - prev[v];
+  const my = pos[v + 1] - prev[v + 1];
+  const mz = pos[v + 2] - prev[v + 2];
+  const along = mx * nx + my * ny + mz * nz;
+  const tx = mx - nx * along;
+  const ty = my - ny * along;
+  const tz = mz - nz * along;
+  const slide = Math.sqrt(tx * tx + ty * ty + tz * tz);
+  if (slide === 0) return;
+  const grip = kinetic * depth;
+  const stop = slide <= STATIC_RATIO * grip ? 1 : grip / slide;
+  pos[v] -= tx * stop;
+  pos[v + 1] -= ty * stop;
+  pos[v + 2] -= tz * stop;
+}
+
 /**
  * Keep particle i above the floor and the table (z = 0), with friction on
  * contact. A particle that was already below last substep (placed there)
@@ -26,10 +53,10 @@ export function prepareCollider({ name, center, axes, half }) {
 export function collidePlane(pos, prev, i, radius, friction) {
   const z = 3 * i + 2;
   if (pos[z] >= radius) return false;
+  const depth = radius - pos[z];
   pos[z] = radius;
   if (prev[z] < radius) prev[z] = radius;
-  pos[3 * i] -= (pos[3 * i] - prev[3 * i]) * friction;
-  pos[3 * i + 1] -= (pos[3 * i + 1] - prev[3 * i + 1]) * friction;
+  rub(pos, prev, i, 0, 0, 1, depth, friction);
   return true;
 }
 
@@ -83,17 +110,16 @@ export function collideBox(pos, prev, i, box, radius, friction) {
   const axis = axes[best];
   const push = bestSide * (half[best] + radius) - bestQ;
   for (let c = 0; c < 3; c += 1) pos[3 * i + c] += axis[c] * push;
-  // Already inside last substep (placed there): move it out without adding speed.
-  if (!enteredAny) for (let c = 0; c < 3; c += 1) prev[3 * i + c] += axis[c] * push;
+  if (!enteredAny) {
+    // Already inside last substep — placed there, or resting right on the face
+    // give or take rounding: leave it no speed into or out of the box, so it
+    // neither jumps out nor keeps pressing in.
+    const along = (pos[3 * i] - prev[3 * i]) * axis[0] + (pos[3 * i + 1] - prev[3 * i + 1]) * axis[1]
+      + (pos[3 * i + 2] - prev[3 * i + 2]) * axis[2];
+    for (let c = 0; c < 3; c += 1) prev[3 * i + c] += axis[c] * along;
+  }
 
-  // friction: take away part of the motion along the face
-  const mx = pos[3 * i] - prev[3 * i];
-  const my = pos[3 * i + 1] - prev[3 * i + 1];
-  const mz = pos[3 * i + 2] - prev[3 * i + 2];
-  const normal = mx * axis[0] + my * axis[1] + mz * axis[2];
-  pos[3 * i] -= (mx - axis[0] * normal) * friction;
-  pos[3 * i + 1] -= (my - axis[1] * normal) * friction;
-  pos[3 * i + 2] -= (mz - axis[2] * normal) * friction;
+  rub(pos, prev, i, axis[0] * bestSide, axis[1] * bestSide, axis[2] * bestSide, Math.abs(push), friction);
   return true;
 }
 
