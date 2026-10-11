@@ -312,3 +312,9 @@ test("at the pile's thickness, a held garment keeps up with a pointer moving 430
   }
   assert.ok(Math.abs(w.grip.from[0] - 215) < 1, `the hand is at x = ${w.grip.from[0].toFixed(1)}, the pointer at 215`);
 });
+
+test("the world keeps each particle's core flag", () => {
+  const half = buildMesh({ id: 'half', size: [20, 10], grid: { cols: 2, rows: 1, cells: '11', core: '10' } });
+  const w = world({ meshes: [sheet(1, 1), half] });
+  assert.deepEqual([...w.core], [1, 1, 1, 1, ...half.core]);
+});

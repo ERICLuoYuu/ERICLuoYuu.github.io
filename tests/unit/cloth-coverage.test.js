@@ -47,3 +47,19 @@ test('the rule: fully covered is locked, bare is open', () => {
   assert.equal(isBookUncovered(0, false), true);
   assert.equal(isBookUncovered(0, true), true);
 });
+
+test('cloth that touches no core cell does not cover the booklet', () => {
+  const book = { x: 0, y: 0, width: 40, height: 40, thickness: 1, rotate: 0 };
+  const lying = (core) => {
+    const mesh = buildMesh({ id: 'm', size: [40, 40], grid: { cols: 4, rows: 4, cells: '1'.repeat(16), core } });
+    const w = createWorld({
+      garments: [{ mesh, material: { stretchCompliance: 0, bendCompliance: 1e-4, friction: 0.5 } }],
+      bounds: { min: [-100, -100, 0], max: [200, 200, 200] },
+      thickness: 7.5,
+    });
+    setPositions(w, 0, Float32Array.from(mesh.rest, (v, i) => (i % 3 === 2 ? v + 10 : v)));
+    return w;
+  };
+  assert.equal(bookCoverage(lying('1'.repeat(16)), book), 1);
+  assert.equal(bookCoverage(lying('0'.repeat(16)), book), 0);
+});

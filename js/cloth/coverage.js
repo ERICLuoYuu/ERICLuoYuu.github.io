@@ -20,7 +20,7 @@ function samplePoints({ x, y, width, height, rotate }, cols, rows) {
 
 /**
  * Share (0…1) of the booklet's top with cloth over it: a sample point counts
- * as covered when some cloth particle above the cover lies within `radius`
+ * as covered when some core cloth particle above the cover lies within `radius`
  * of it, seen from above.
  */
 export function bookCoverage(world, book, { cols = 8, rows = 11, radius = 9 } = {}) {
@@ -33,6 +33,7 @@ export function bookCoverage(world, book, { cols = 8, rows = 11, radius = 9 } = 
   // Only cloth above the cover and near the booklet can cover it.
   const nearby = [];
   for (let i = 0; i < world.count; i += 1) {
+    if (world.core && !world.core[i]) continue; // a transparent margin hides nothing
     const px = world.pos[3 * i];
     const py = world.pos[3 * i + 1];
     if (world.pos[3 * i + 2] > top && Math.hypot(px - cx, py - cy) < reach) nearby.push([px, py]);

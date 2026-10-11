@@ -50,6 +50,8 @@ export function createWorld({ garments, colliders = [], bounds, thickness = 6, s
     rest.set(mesh.rest, 3 * offsets[g]);
     garmentOf.fill(g, offsets[g], offsets[g] + counts[g]);
   });
+  const core = new Uint8Array(count);
+  garments.forEach(({ mesh }, g) => core.set(mesh.core ?? new Uint8Array(counts[g]).fill(1), offsets[g]));
 
   const constraints = garments.flatMap(({ mesh, material }, g) => [
     ...mesh.stretch.map((c) => ({ ...c, g, compliance: material.stretchCompliance })),
@@ -71,6 +73,7 @@ export function createWorld({ garments, colliders = [], bounds, thickness = 6, s
     rest,
     invMass: new Float32Array(count).fill(1),
     garmentOf,
+    core,
     thickness,
     bounds,
     settings: merged,

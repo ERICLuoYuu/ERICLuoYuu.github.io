@@ -55,3 +55,19 @@ test('a malformed grid is rejected with a clear message', () => {
   assert.throws(() => buildMesh(garment('1x', 2, 1)), /test: grid/);
   assert.throws(() => buildMesh(garment('00', 2, 1)), /test: .*no covered cells/);
 });
+
+test('core marks the corners of core cells; without a core every particle counts', () => {
+  const plain = buildMesh(garment('11', 2, 1));
+  assert.deepEqual([...plain.core], [1, 1, 1, 1, 1, 1]);
+  const m = buildMesh({ id: 'half', size: [20, 10], grid: { cols: 2, rows: 1, cells: '11', core: '10' } });
+  for (let v = 0; v < m.count; v += 1) {
+    assert.equal(m.core[v], m.rest[3 * v] < 15 ? 1 : 0, `corner at x = ${m.rest[3 * v]}`);
+  }
+});
+
+test('a core cell outside the covered cells is refused', () => {
+  assert.throws(
+    () => buildMesh({ id: 'bad', size: [20, 10], grid: { cols: 2, rows: 1, cells: '10', core: '01' } }),
+    /grid\.core/,
+  );
+});
