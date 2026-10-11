@@ -1,6 +1,6 @@
 # Vacuum pack and detailed garments — design
 
-Date: 2026-10-11 · Status: approved; **Revision B** (below the decisions) awaiting review
+Date: 2026-10-11 · Status: approved, including **Revision B** (below the decisions)
 
 Builds on `2026-10-11-clothes-pile-design.md` (the cloth layer, the pile and
 the booklet lock stay as specified there unless this document says otherwise).
