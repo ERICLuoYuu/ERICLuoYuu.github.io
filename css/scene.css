@@ -30,8 +30,9 @@ body.reader-open .stage { filter: blur(3px) brightness(.7) saturate(.85); }
 }
 
 .probe {
+  /* zero-size, so its on-screen box is exactly the projected point */
   position: absolute; left: 0; top: 0;
-  width: 1px; height: 1px;
+  width: 0; height: 0;
   pointer-events: none;
 }
 
@@ -155,10 +156,11 @@ body[data-state="dark"] .floor-glow { opacity: 1; }
 /* Cut through: the long flaps relax upward a touch, then everything opens. */
 .parcel.is-cut .flap.front,
 .parcel.is-cut .flap.back { --a: -5deg; transition-duration: .4s; }
-.parcel.is-open .flap.front { --a: -156deg; transition-duration: 1.05s; transition-delay: 0s; }
-.parcel.is-open .flap.back { --a: -116deg; transition-duration: 1.05s; transition-delay: .13s; }
-.parcel.is-open .flap.left { --a: -134deg; transition-delay: .4s; }
-.parcel.is-open .flap.right { --a: -147deg; transition-delay: .52s; }
+/* The open angles come from geometry.js (FLAP_OPEN) so the clothes collide with the same flaps. */
+.parcel.is-open .flap.front { --a: var(--open-front); transition-duration: 1.05s; transition-delay: 0s; }
+.parcel.is-open .flap.back { --a: var(--open-back); transition-duration: 1.05s; transition-delay: .13s; }
+.parcel.is-open .flap.left { --a: var(--open-left); transition-delay: .4s; }
+.parcel.is-open .flap.right { --a: var(--open-right); transition-delay: .52s; }
 .parcel.no-anim, .parcel.no-anim * { transition: none !important; }
 
 /* ─── contents ─────────────────────────────────────────────────────────── */

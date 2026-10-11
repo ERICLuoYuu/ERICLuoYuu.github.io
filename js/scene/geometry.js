@@ -22,6 +22,9 @@ export const CONTENTS = Object.freeze({
   desiccant: Object.freeze({ x: 368, y: 232, width: 42, height: 60, thickness: 3, rotate: -12 }),
 });
 
+/** How far each flap swings open (CSS rotateX, degrees). parcel.js hands these to scene.css. */
+export const FLAP_OPEN = Object.freeze({ front: -156, back: -116, left: -134, right: -147 });
+
 const RAD = Math.PI / 180;
 
 /** CSS rotateX(deg) applied to a point (x right, y down, z toward the viewer). */

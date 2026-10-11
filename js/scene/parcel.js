@@ -4,7 +4,7 @@
  * (scene.css) driven by the custom properties set here from BOX/CONTENTS.
  */
 
-import { BOX, CONTENTS, tapeCorners } from './geometry.js';
+import { BOX, CONTENTS, FLAP_OPEN, tapeCorners } from './geometry.js';
 import { cssUrl } from '../core/env.js';
 
 const SIDES = ['front', 'back', 'left', 'right'];
@@ -37,9 +37,17 @@ function buildWall(side) {
 function buildFlap(side) {
   const isLong = side === 'front' || side === 'back';
   const flap = h('div', `flap ${side}`);
+  const length = isLong ? BOX.width : BOX.depth;
+  // Corner markers (hinge-left, hinge-right, tip-right, tip-left), matching solids.flapCorners().
+  const corners = [[0, BOX.flapDepth], [length, BOX.flapDepth], [length, 0], [0, 0]].map(([u, v]) => {
+    const marker = probe(u, v);
+    marker.classList.add('flap-probe');
+    return marker;
+  });
   flap.append(
     h('div', `face outer cardboard ${isLong ? 'art-flap-long' : 'art-flap-short'}`),
     h('div', 'face inner cardboard liner art-box-inside'),
+    ...corners,
   );
   let tapeSvg = null;
   if (isLong) {
@@ -112,6 +120,7 @@ export function buildParcel(container, { text }) {
   const vars = {
     '--W': BOX.width, '--D': BOX.depth, '--H': BOX.height, '--F': BOX.flapDepth,
     '--T': BOX.tapeWidth, '--drop': BOX.tapeDrop, '--light': 0,
+    ...Object.fromEntries(Object.entries(FLAP_OPEN).map(([side, deg]) => [`--open-${side}`, `${deg}deg`])),
   };
   Object.entries(vars).forEach(([k, v]) => parcel.style.setProperty(k, v));
 
