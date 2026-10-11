@@ -33,7 +33,7 @@ export const DEFAULTS = Object.freeze({
 const neighbourReach = (thickness, { travel, substeps }) => thickness * (1 + travel * substeps);
 
 /**
- * @param {{garments: {mesh: object, material: {stretchCompliance:number, bendCompliance:number, friction:number}}[],
+ * @param {{garments: {mesh: object, material: {stretchCompliance:number, bendCompliance:number, friction:number, mass?:number}}[],
  *          colliders?: object[], bounds: {min:number[], max:number[]}, thickness?: number, settings?: object}} options
  */
 export function createWorld({ garments, colliders = [], bounds, thickness = 6, settings = {} }) {
@@ -52,6 +52,9 @@ export function createWorld({ garments, colliders = [], bounds, thickness = 6, s
   });
   const core = new Uint8Array(count);
   garments.forEach(({ mesh }, g) => core.set(mesh.core ?? new Uint8Array(counts[g]).fill(1), offsets[g]));
+  // Each particle's inverse mass: a body's material may make it heavier (`mass`, default 1).
+  const restInvMass = new Float32Array(count);
+  garments.forEach(({ material }, g) => restInvMass.fill(1 / (material.mass ?? 1), offsets[g], offsets[g] + counts[g]));
 
   const constraints = garments.flatMap(({ mesh, material }, g) => [
     ...mesh.stretch.map((c) => ({ ...c, g, compliance: material.stretchCompliance })),
@@ -71,7 +74,8 @@ export function createWorld({ garments, colliders = [], bounds, thickness = 6, s
     prev: Float32Array.from(pos),
     vel: new Float32Array(3 * count),
     rest,
-    invMass: new Float32Array(count).fill(1),
+    invMass: Float32Array.from(restInvMass),
+    restInvMass,
     garmentOf,
     core,
     thickness,
@@ -159,7 +163,7 @@ export function moveGrip(world, target) {
 /** Let go: the held particles fall with whatever speed the hand gave them. */
 export function release(world) {
   if (!world.grip) return;
-  world.grip.ids.forEach((i) => { world.invMass[i] = 1; });
+  world.grip.ids.forEach((i) => { world.invMass[i] = world.restInvMass[i]; });
   world.grip = null;
 }
 

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { openSite, stateOf, bookOf, waitForState, mouseCutAll } from './helpers.js';
-import { clearWithMouse, bareBookletPoint } from './clothes-helpers.js';
+import { clearWithMouse, bareBookletPoint, pointOn } from './clothes-helpers.js';
 
 test.describe('the whole parcel, start to finish', () => {
   test.skip(({ isMobile }) => isMobile, 'desktop journey');
@@ -17,7 +17,7 @@ test.describe('the whole parcel, start to finish', () => {
     await waitForState(page, 'overhead');
     const light = await page.$eval('.parcel', (el) => el.style.getPropertyValue('--light'));
     expect(Number(light)).toBeCloseTo(1, 2);
-    await expect(page.locator('.pack')).toBeVisible();
+    expect(await pointOn(page, 'pack'), 'the pack lies in the box').not.toBeNull();
 
     await clearWithMouse(page);
     const bare = await bareBookletPoint(page);

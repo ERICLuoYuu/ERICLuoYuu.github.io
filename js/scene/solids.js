@@ -75,7 +75,7 @@ function floorItemCollider(name, { x, y, width, height, thickness, rotate }, bas
   return obb(name, centre, axes, [width / 2, height / 2, thickness / 2]);
 }
 
-/** Oriented boxes for the walls, the open flaps, the booklet, the desiccant, the pack and the books. */
+/** Oriented boxes for the walls, the open flaps, the booklet, the desiccant and the books (the pack is cloth: js/cloth). */
 export function boxColliders() {
   const sides = Object.keys(SIDES);
   return [
@@ -83,7 +83,6 @@ export function boxColliders() {
     ...sides.map(flapCollider),
     floorItemCollider('book', CONTENTS.book, 0.6), // .book3d: translateZ(.6px)
     floorItemCollider('desiccant', CONTENTS.desiccant, baseOf(CONTENTS.desiccant)),
-    floorItemCollider('pack', CONTENTS.pack, 0),
     ...BOOKS.map((b) => floorItemCollider(b.id, b, baseOf(b))),
   ];
 }

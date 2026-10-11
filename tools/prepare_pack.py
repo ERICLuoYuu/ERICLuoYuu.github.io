@@ -15,6 +15,7 @@ background) is used as it is.
 Writes into the output folder:
   vacuum-pack.webp        the pack: transparent around it, see-through film
   vacuum-pack-shade.webp  soft light and shade where the contents bulge the film
+  vacuum-pack-relief.webp the bulge as a height map, lit by the cloth layer
 """
 
 from __future__ import annotations
@@ -39,6 +40,7 @@ HEIGHT = 1200  # px: height of the saved images
 LIGHT = np.array([-0.35, -0.45, 1.0]) / np.linalg.norm([-0.35, -0.45, 1.0])  # js/cloth/shading.js LIGHT_DIR
 SHADE_MAX = 0.18  # strongest opacity of the shade overlay
 SHADE_GAIN = 2.2  # overlay opacity per unit of lighting change
+RISE = 0.02  # the fullest bulge rises about 2 % of the pack's height
 
 
 class PackError(Exception):
@@ -134,15 +136,20 @@ def cut_out(rgb: np.ndarray, given: np.ndarray | None, film: float, hints: list[
     return colour, alpha, solid
 
 
-def relief_shade(alpha: np.ndarray, solid: np.ndarray) -> np.ndarray:
-    """RGBA overlay: white where the bulging film faces the light, black where it faces away."""
+def bulge_height(alpha: np.ndarray, solid: np.ndarray) -> np.ndarray:
+    """Height of the film in pixels: domed over the solids, rounding off toward the rim."""
     height = alpha.shape[0]
     inside = alpha > 0.01
     bulge = ndi.gaussian_filter(solid.astype(np.float64), 0.015 * height)
     rim = np.sqrt(np.clip(ndi.distance_transform_edt(inside) / (0.08 * height), 0, 1)) * 0.35
-    surface = (bulge + rim) * 0.02 * height  # px: the fullest bulge rises about 2 % of the pack's height
-    gy, gx = np.gradient(surface)
-    normal = np.dstack([-gx, -gy, np.ones_like(surface)])
+    return (bulge + rim) * RISE * height
+
+
+def relief_shade(alpha: np.ndarray, solid: np.ndarray) -> np.ndarray:
+    """RGBA overlay: white where the bulging film faces the light, black where it faces away."""
+    inside = alpha > 0.01
+    gy, gx = np.gradient(bulge_height(alpha, solid))
+    normal = np.dstack([-gx, -gy, np.ones_like(gx)])
     normal /= np.linalg.norm(normal, axis=2, keepdims=True)
     change = normal @ LIGHT - LIGHT[2]  # brighter (+) or darker (−) than flat film
     strength = np.clip(np.abs(change) * SHADE_GAIN, 0, SHADE_MAX) * inside
@@ -150,6 +157,18 @@ def relief_shade(alpha: np.ndarray, solid: np.ndarray) -> np.ndarray:
     shade[..., :3] = np.where(change[..., None] > 0, 255, 0)
     shade[..., 3] = np.round(strength * 255)
     return shade
+
+
+def relief_map(alpha: np.ndarray, solid: np.ndarray) -> np.ndarray:
+    """The bulge in the garments' relief format: 8-bit height, 0 off the pack, 255 at the fullest bulge."""
+    surface = bulge_height(alpha, solid) * (alpha > 0.01)
+    top = surface.max()
+    return np.round(surface / top * 255).astype(np.uint8) if top > 0 else np.zeros(alpha.shape, np.uint8)
+
+
+def save_relief(level: np.ndarray, path: Path, size: tuple[int, int]) -> None:
+    """One channel, at the pack picture's size, so the two line up texel for texel."""
+    Image.fromarray(level).resize(size, Image.LANCZOS).save(path, "WEBP", quality=90, method=6)
 
 
 def crop_box(alpha: np.ndarray) -> tuple[int, int, int, int]:
@@ -202,6 +221,7 @@ def main(argv: list[str] | None = None) -> int:
     out.mkdir(parents=True, exist_ok=True)
     saved = save(pack, out / "vacuum-pack.webp", args.height)
     save(shade, out / "vacuum-pack-shade.webp", args.height)
+    save_relief(relief_map(alpha[y0:y1, x0:x1], solid[y0:y1, x0:x1]), out / "vacuum-pack-relief.webp", saved.size)
     print(f"{out / 'vacuum-pack.webp'}: {saved.width} x {saved.height}, aspect {saved.width / saved.height:.4f}")
     return 0
 

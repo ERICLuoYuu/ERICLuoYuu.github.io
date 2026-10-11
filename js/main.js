@@ -182,15 +182,20 @@ function wireClothes(app, flow) {
     })
     : NO_KEYS;
   flow.attachClothes();
+  /** Show or hide the clothes; while they show, the layer draws the pack and the CSS one steps aside. */
+  const showClothes = (on) => {
+    clothes.show(on);
+    app.scene.pack.el.classList.toggle('is-handed-over', clothes.enabled && on);
+  };
   let timer = 0;
   machine.subscribe((to) => {
     clearTimeout(timer);
     if (to !== 'overhead') input.cancel();
     if (to === 'revealing') {
-      timer = setTimeout(() => clothes.show(true), prefersReducedMotion() ? 0 : CLOTHES_REVEAL_DELAY);
+      timer = setTimeout(() => showClothes(true), prefersReducedMotion() ? 0 : CLOTHES_REVEAL_DELAY);
       return;
     }
-    clothes.show(CLOTHES_VISIBLE.has(to));
+    showClothes(CLOTHES_VISIBLE.has(to));
     if (to === 'sealed') clothes.reset();
   });
 }
@@ -332,12 +337,17 @@ async function start() {
     sound: () => sound.status(),
     book: () => bookView.status(),
     clothes: () => ({ ...app.clothes.status(), reachable: flow.bookReachable() }),
-    /** The id of the garment on top at screen point (x, y), or null. */
+    /** The id of the body (a garment or the pack) on top at screen point (x, y), or null. */
     pick: (x, y) => {
       const hit = app.clothes.pickAt(x, y);
-      return hit ? app.clothes.garments[hit.garment].id : null;
+      return hit ? app.clothes.bodies[hit.garment].id : null;
     },
-    garmentBox: (id) => app.clothes.screenBox(app.clothes.garments.findIndex((g) => g.id === id)),
+    /** What lies on top at (x, y): its id, the texture point and the picture's opacity there. */
+    hit: (x, y) => {
+      const hit = app.clothes.pickAt(x, y);
+      return hit ? { id: app.clothes.bodies[hit.garment].id, uv: hit.uv, opacity: hit.opacity } : null;
+    },
+    garmentBox: (id) => app.clothes.screenBox(app.clothes.bodies.findIndex((g) => g.id === id)),
     project: (point) => app.clothes.project(point),
   };
 }

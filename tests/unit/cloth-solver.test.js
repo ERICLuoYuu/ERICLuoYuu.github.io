@@ -1,11 +1,13 @@
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { buildMesh } from '../../js/cloth/mesh.js';
 import {
-  createWorld, setPositions, step, grab, moveGrip, release, isSettled, centroid, sleepAll,
+  createWorld, setPositions, step, grab, moveGrip, release, isSettled, centroid, sleepAll, sleep,
 } from '../../js/cloth/solver.js';
+import { bookCoverage } from '../../js/cloth/coverage.js';
 import { boxColliders } from '../../js/scene/solids.js';
-import { CONTENTS } from '../../js/scene/geometry.js';
+import { CONTENTS, BOOKS, baseOf } from '../../js/scene/geometry.js';
 
 const sheet = (cols = 6, rows = 6) => buildMesh({ id: 'sheet', size: [cols * 10, rows * 10], grid: { cols, rows, cells: '1'.repeat(cols * rows) } });
 const material = { stretchCompliance: 0, bendCompliance: 2e-5, friction: 0.5 };
@@ -32,6 +34,39 @@ const run = (w, seconds) => {
   for (let t = 0; t < seconds; t += 1 / 60) step(w, 1 / 60);
 };
 const zs = (w) => w.pos.filter((_, i) => i % 3 === 2);
+
+const FINE = 4.5; // the pile's thickness (tools/build-pile.mjs)
+const fine = (cols, rows) => buildMesh({ id: 'fine', size: [cols * 6, rows * 6], grid: { cols, rows, cells: '1'.repeat(cols * rows) } });
+
+/** The vacuum pack's record in garments.json. */
+function packRecord() {
+  const data = JSON.parse(readFileSync(new URL('../../assets/clothes/garments.json', import.meta.url), 'utf8'));
+  const pack = data.garments.find((g) => g.kind === 'film');
+  if (!pack) throw new Error('garments.json has no pack body yet (npm run clothes)');
+  return pack;
+}
+
+/** The pack asleep in its place, plus sheets of `meshes` to drop on it. */
+function packWorld(meshes = []) {
+  const pack = packRecord();
+  const mesh = buildMesh(pack);
+  const w = createWorld({
+    garments: [{ mesh, material: pack.material }, ...meshes.map((m) => ({ mesh: m, material }))],
+    colliders: boxColliders(),
+    bounds,
+    thickness: FINE,
+  });
+  setPositions(w, 0, Float32Array.from(mesh.rest, (v, i) => v + [CONTENTS.pack.x, CONTENTS.pack.y, FINE / 2][i % 3]));
+  sleep(w, 0);
+  return w;
+}
+
+/** A floor point in a rotated rectangle's own frame: (0, 0) at its top-left corner. */
+const local = ([px, py], { x, y, width, height, rotate }) => {
+  const a = (-rotate * Math.PI) / 180;
+  const [dx, dy] = [px - x - width / 2, py - y - height / 2];
+  return [dx * Math.cos(a) - dy * Math.sin(a) + width / 2, dx * Math.sin(a) + dy * Math.cos(a) + height / 2];
+};
 
 test('a new world lays each garment flat at its rest shape', () => {
   const w = world();
@@ -293,13 +328,15 @@ test('off a steep side of a heap a garment still slips down', () => {
 });
 
 test('cloth dropped on the vacuum pack rests on top of it', () => {
-  const mesh = sheet(4, 4);
-  const w = world({ meshes: [mesh], colliders: boxColliders() });
-  const { x, y, width, height, thickness } = CONTENTS.pack;
-  const at = [x + width / 2 - 20, y + height / 2 - 20, 30];
-  setPositions(w, 0, Float32Array.from(mesh.rest, (v, i) => v + at[i % 3]));
+  const cloth = fine(8, 8);
+  const w = packWorld([cloth]);
+  setPositions(w, 1, Float32Array.from(cloth.rest, (v, i) => v + [70, 120, 30][i % 3]));
   run(w, 2);
-  zs(w).forEach((z) => assert.ok(z >= thickness + THICKNESS / 2 - 0.5, `z = ${z}`));
+  // The pack is cloth: a particle can settle into the middle of one of its cells, a little under a full thickness up.
+  const { size, grid } = packRecord();
+  const half = Math.hypot(size[0] / grid.cols, size[1] / grid.rows) / 2;
+  const lowest = FINE / 2 + Math.sqrt(FINE ** 2 - half ** 2);
+  zs(w).slice(w.offsets[1]).forEach((z) => assert.ok(z >= lowest - 0.25, `z = ${z}, below the pack's surface`));
 });
 
 test("at the pile's thickness, a held garment keeps up with a pointer moving 430 units a second", () => {
@@ -317,4 +354,32 @@ test("the world keeps each particle's core flag", () => {
   const half = buildMesh({ id: 'half', size: [20, 10], grid: { cols: 2, rows: 1, cells: '11', core: '10' } });
   const w = world({ meshes: [sheet(1, 1), half] });
   assert.deepEqual([...w.core], [1, 1, 1, 1, ...half.core]);
+});
+
+test("a heavy body keeps its weight: four times a garment's, back again after it is held", () => {
+  const w = createWorld({
+    garments: [{ mesh: sheet(1, 1), material: { ...material, mass: 4 } }, { mesh: sheet(1, 1), material }],
+    bounds,
+    thickness: THICKNESS,
+  });
+  assert.deepEqual([...w.invMass], [0.25, 0.25, 0.25, 0.25, 1, 1, 1, 1]);
+  grab(w, 0, [0, 1], [0, 0, 20]);
+  assert.equal(w.invMass[0], 0);
+  release(w);
+  assert.deepEqual([...w.invMass.slice(0, 2)], [0.25, 0.25]);
+});
+
+test('the pack laid over the booklet and the books rests on them and hides the booklet', () => {
+  const w = packWorld();
+  setPositions(w, 0, shifted(w, 0, [200, 0, 40]));
+  run(w, 3);
+  assert.ok(bookCoverage(w, CONTENTS.book) >= 0.85, 'over the booklet, the pack hides it like cloth does');
+  const dictionary = BOOKS.find((b) => b.id === 'dictionary');
+  const top = baseOf(dictionary) + dictionary.thickness;
+  const over = [...Array(w.count).keys()].filter((i) => {
+    const [u, v] = local([w.pos[3 * i], w.pos[3 * i + 1]], dictionary);
+    return u > 4 && u < dictionary.width - 4 && v > 4 && v < dictionary.height - 4;
+  });
+  assert.ok(over.length > 20, `${over.length} of the pack's particles lie over the dictionary`);
+  over.forEach((i) => assert.ok(w.pos[3 * i + 2] >= top + FINE / 2 - 0.5, `z = ${w.pos[3 * i + 2]}`));
 });

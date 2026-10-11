@@ -4,9 +4,10 @@
  *
  *   node tools/build-pile.mjs        (npm run clothes runs it after the art)
  *
- * Each garment is laid out flat, folded a little (sleeves in, halves over),
- * turned and dropped onto the booklet in the upper right with the same
- * solver the site uses.
+ * The pack (a film body) lies flat in its place first; each garment is then
+ * laid out flat, folded a little (sleeves in, halves over), turned and
+ * dropped onto the booklet in the upper right with the same solver the site
+ * uses.
  * The result goes to assets/clothes/pile.json. If the pile does not hide the
  * booklet or covers too much of the pack, the next random seed is tried.
  */
@@ -115,6 +116,8 @@ function fitInside(positions) {
 }
 
 const parked = (positions) => positions.map((v, i) => (i % 3 === 0 ? v + PARKED_X : v));
+/** A film body (the pack) lies flat where CONTENTS.pack puts it, never folded. */
+const laidFlat = (mesh) => Float32Array.from(mesh.rest, (v, i) => v + [CONTENTS.pack.x, CONTENTS.pack.y, THICKNESS / 2][i % 3]);
 
 function highestPoint(world) {
   let top = 0;
@@ -142,8 +145,8 @@ function buildPile(garments, seed) {
     bounds: BOUNDS,
     thickness: THICKNESS,
   });
-  garments.forEach((_, g) => {
-    setPositions(world, g, parked(meshes[g].rest));
+  garments.forEach((garment, g) => {
+    setPositions(world, g, garment.kind === 'film' ? laidFlat(meshes[g]) : parked(meshes[g].rest));
     sleep(world, g);
   });
   PLAN.forEach((placement) => {
@@ -157,7 +160,7 @@ function buildPile(garments, seed) {
 
 async function main() {
   const data = JSON.parse(await readFile(new URL('assets/clothes/garments.json', ROOT), 'utf8'));
-  const order = data.garments.map((g) => g.id);
+  const order = data.garments.filter((g) => g.kind !== 'film').map((g) => g.id);
   if (PLAN.length !== order.length || !PLAN.every((p) => order.includes(p.id))) {
     throw new Error('PLAN must place every garment in garments.json exactly once');
   }

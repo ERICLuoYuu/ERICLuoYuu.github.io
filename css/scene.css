@@ -193,6 +193,9 @@ body[data-state="dark"] .floor-glow { opacity: 1; }
   filter: drop-shadow(2px 3px 2.5px rgba(30, 18, 8, .42)) brightness(calc(1 - (1 - var(--light, 1)) * .95));
 }
 .pack-img, .pack-shade { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* With the clothes layer showing, the pack is drawn there, a body visitors can move; the CSS pack is the fallback.
+   Out of sight, not out of the accessibility tree: screen readers still hear photo.alt. */
+.pack.is-handed-over { opacity: 0; }
 .desiccant {
   position: absolute;
   transform: translateZ(calc(var(--base, 0px) + 1.2px)) rotate(var(--rot));

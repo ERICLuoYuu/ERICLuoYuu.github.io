@@ -20,6 +20,7 @@ const LIFT = 45; // the hand holds cloth this far above what lies beneath
 const MIN_HEIGHT = 60;
 const LOWER_RATE = 5; // per second: how quickly the hand sinks back after clearing something tall
 const GRIP_RADIUS = 11; // particles this close to the hold point are held
+const GARMENT_REACH = 20; // a garment hangs well below the hand: it rises for anything this close to the pointer
 const REACH = { min: [-600, -500], max: [1100, 900] }; // where the hand may carry a garment
 // Out of the box, cloth must go past the open flaps onto the table: the
 // flaps lean outwards at 24–64° above level and cloth left on them slides
@@ -74,12 +75,16 @@ export function dropAt(world, colliders, g, [x, y]) {
 }
 
 /**
- * @param {{world: object, colliders: object[], ray: (sx: number, sy: number) => {origin: number[], dir: number[]}}} options
+ * @param {{world: object, colliders: object[], ray: (sx: number, sy: number) => {origin: number[], dir: number[]},
+ *          holds?: ({radius: number, lift: number}|undefined)[]}} options
+ *   holds[g]: how the hand holds body g — the pack: a wide patch lifted a little. Garments use the default.
  */
-export function createHand({ world, colliders, ray }) {
-  let held = null; // { garment, base, height, want, xy, sx, sy, script }
+export function createHand({ world, colliders, ray, holds = [] }) {
+  let held = null; // { garment, lift, reach, base, height, want, xy, sx, sy, script }
 
-  const wantAt = (x, y) => Math.max(held.base, supportHeight(world, colliders, x, y, { skip: held.garment, moving: false }) + LIFT);
+  const wantAt = (x, y) => Math.max(
+    held.base, supportHeight(world, colliders, x, y, { skip: held.garment, moving: false, reach: held.reach }) + held.lift,
+  );
 
   /** Move the hand to (x, y) at its height, rising first if something below is taller. */
   function place([x, y]) {
@@ -116,8 +121,15 @@ export function createHand({ world, colliders, ray }) {
 
   function take(garment, ids, point) {
     drop();
-    hold(world, garment, gripCluster(world, { garment, ids, point }, GRIP_RADIUS), point);
-    held = { garment, base: Math.max(point[2] + LIFT, MIN_HEIGHT), height: point[2], want: 0, xy: [point[0], point[1]], sx: 0, sy: 0, script: null };
+    // A body with a hold of its own (the pack) rides only its own lift above what lies directly beneath the
+    // hand, within a particle's radius: it lies along the walls, and a wall merely nearby must not lift it.
+    const { radius, lift, floor, reach } = holds[garment]
+      ? { floor: 0, reach: world.thickness / 2, ...holds[garment] }
+      : { radius: GRIP_RADIUS, lift: LIFT, floor: MIN_HEIGHT, reach: GARMENT_REACH };
+    hold(world, garment, gripCluster(world, { garment, ids, point }, radius), point);
+    held = {
+      garment, lift, reach, base: Math.max(point[2] + lift, floor), height: point[2], want: 0, xy: [point[0], point[1]], sx: 0, sy: 0, script: null,
+    };
   }
 
   function follow(from, to, duration, done) {

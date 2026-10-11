@@ -26,11 +26,6 @@ test('over the booklet, its cover', () => {
   assert.ok(near(supportHeight(noCloth, colliders, x + width / 2, y + height / 2), 0.6 + thickness));
 });
 
-test('over the vacuum pack, its top', () => {
-  const { x, y, width, height, thickness } = CONTENTS.pack;
-  assert.ok(near(supportHeight(noCloth, colliders, x + width / 2, y + height / 2), thickness));
-});
-
 test('over an open flap, the flap surface at that spot', () => {
   const [hingeL, hingeR, tipR, tipL] = flapCorners('front');
   const mid = (p, q) => p.map((v, i) => (v + q[i]) / 2);

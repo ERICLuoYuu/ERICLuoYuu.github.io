@@ -28,7 +28,9 @@ test('the vacuum pack and the desiccant packet lie on the box floor', async ({ p
   const packet = await loaded('.desiccant');
   expect(packet.src).toContain('assets/art/desiccant.webp');
   expect(packet.ok).toBe(true);
-  const [packBox, bookBox] = await Promise.all([page.locator('.pack-body').boundingBox(), page.locator('.book3d').boundingBox()]);
+  // the CSS pack is handed over (transparent) while the clothes show: measure layout boxes
+  const rect = (selector) => page.$eval(selector, (el) => el.getBoundingClientRect().toJSON());
+  const [packBox, bookBox] = await Promise.all([rect('.pack-body'), rect('.book3d')]);
   expect(packBox.x + packBox.width).toBeLessThan(bookBox.x + 4); // the pack lies to the left of the booklet
   expect(problems).toEqual([]);
 });

@@ -18,6 +18,7 @@ import json
 import math
 import random
 import sys
+import zlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
@@ -27,6 +28,7 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # run as a script: make `clothes` importable
 from clothes.fit import CELL, cell_grid, fit, grid_shape  # noqa: E402
+from pack_body import pack_record  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "assets" / "clothes"
@@ -109,7 +111,7 @@ class Canvas:
     def fabric(self, color: str, grain: float = 0.035, weave: str | None = None) -> None:
         """Base colour with fine fibre noise and an optional knit/weave direction."""
         w, h = self.size
-        rng = np.random.default_rng(abs(hash(color)) % 2**32)
+        rng = np.random.default_rng(zlib.crc32(color.encode()))  # hash() of a str changes from run to run
         noise = rng.standard_normal((h // 2 + 1, w // 2 + 1)).astype(np.float32)
         noise = np.asarray(Image.fromarray(noise).resize((w, h), Image.BILINEAR))
         if weave == "knit":
@@ -455,6 +457,7 @@ def main() -> None:
         })
         covered = grid["cells"].count("1") / len(grid["cells"])
         print(f"{g.id:13s} {image.width}x{image.height}px  {path.stat().st_size // 1024:3d} KB  cloth cells {covered:.0%}")
+    records.append(pack_record(ROOT))  # the pack: one more, stiff and heavy, body (kind "film")
     data = {"spacing": CELL, "pxPerUnit": PX, "garments": records}
     (OUT / "garments.json").write_text(json.dumps(data, indent=1) + "\n", encoding="utf-8", newline="\n")
 

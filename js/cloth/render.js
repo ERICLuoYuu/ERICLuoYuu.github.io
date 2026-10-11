@@ -21,7 +21,7 @@ import { createSmoother } from './smooth.js';
 const SHADOW_SIZE = 2048;
 const SHADOW_STRENGTH = 0.38; // darkest tint a cloth shadow lays on the box, in full light
 const SHADOW_BIAS = 0.0015; // ≈ 1.2 units of light depth
-const DROP = 2.5; // particles float half a thickness above what they lie on; draw the cloth a little lower
+export const DROP = 1.25; // particles float half the pile's thickness (2.25) above what they lie on: draw the cloth lower, still 1 clear
 const DARK = [0x14 / 255, 0x0d / 255, 0x07 / 255]; // .inside::after
 const ATTRIBUTES = ['aPos', 'aNormal', 'aUv', 'aCavity'];
 const FINE_CREASE = CREASE * 4; // the drawn mesh is twice as fine: creases sit a quarter as deep below neighbours

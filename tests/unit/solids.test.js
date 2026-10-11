@@ -34,9 +34,9 @@ test('side flaps hinge on their own walls', () => {
   assert.ok(flapCorners('left', FLAP_OPEN.left)[3][0] < 0, 'the left flap opens to the left');
 });
 
-test('colliders: 4 walls, 4 open flaps, the booklet, the desiccant, the pack and four books, each a proper box', () => {
+test('colliders: 4 walls, 4 open flaps, the booklet, the desiccant and four books, each a proper box', () => {
   const colliders = boxColliders();
-  assert.equal(colliders.length, 15);
+  assert.equal(colliders.length, 14);
   colliders.forEach(({ kind, axes, half, center }) => {
     assert.equal(kind, 'obb');
     axes.forEach((a, i) => axes.forEach((b, j) => near(dot(a, b), i === j ? 1 : 0, 1e-9)));
@@ -62,7 +62,7 @@ test('the booklet collider sits on the floor at the booklet\'s place and thickne
 
 test('occluders: the table plus every face of every collider, as planar quads', () => {
   const quads = occluderQuads();
-  assert.equal(quads.length, 1 + 15 * 6);
+  assert.equal(quads.length, 1 + 14 * 6);
   quads.forEach((quad) => {
     assert.equal(quad.length, 4);
     const [a, b, c, d] = quad;
@@ -73,15 +73,6 @@ test('occluders: the table plus every face of every collider, as planar quads', 
   });
   const table = quads[0];
   table.forEach(([, , z]) => near(z, 0));
-});
-
-test('the pack collider lies on the floor under its flat part, as thick as the pack', () => {
-  const pack = boxColliders().find((c) => c.name === 'pack');
-  const { x, y, width, height, thickness } = CONTENTS.pack;
-  near(pack.center[0], x + width / 2);
-  near(pack.center[1], y + height / 2);
-  near(pack.center[2] - pack.half[2], 0);
-  near(pack.half[2] * 2, thickness);
 });
 
 test('each book is a collider resting on the floor or on the book beneath it', () => {

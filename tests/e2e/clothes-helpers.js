@@ -102,3 +102,21 @@ export async function tabToBooklet(page) {
   }
   await expect(page.locator('.book-top')).toBeFocused();
 }
+
+/** Screen points spread over a body's outline on screen, n − 1 to a side. */
+export async function gridOver(page, id, n = 16) {
+  const box = await page.evaluate((gid) => window.__parcel.garmentBox(gid), id);
+  const points = [];
+  for (let j = 1; j < n; j += 1) {
+    for (let i = 1; i < n; i += 1) points.push({ x: box.left + (box.width * i) / n, y: box.top + (box.height * j) / n });
+  }
+  return points;
+}
+
+/** Those of `points` where the pack's clear film is on top all around (its picture 0.3–0.6 opaque within 5 px). */
+export async function filmPoints(page, points) {
+  return page.evaluate((all) => all.filter(({ x, y }) => [[0, 0], [-5, -5], [5, -5], [-5, 5], [5, 5]].every(([dx, dy]) => {
+    const hit = window.__parcel.hit(x + dx, y + dy);
+    return hit?.id === 'pack' && hit.opacity > 0.3 && hit.opacity < 0.6;
+  })), points);
+}

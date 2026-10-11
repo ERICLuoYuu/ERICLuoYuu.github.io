@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { openSite, stateOf, waitForState, touchDrag } from './helpers.js';
 import {
-  clothesOf, waitForSettled, pointOn, dragMouse, clearWithKeyboard, tabToBooklet,
+  clothesOf, waitForSettled, pointOn, dragMouse, clearWithKeyboard, tabToBooklet, gridOver, filmPoints,
 } from './clothes-helpers.js';
 
 const shownKeys = (page) => page.locator('.clothes-key:not([hidden])');
@@ -15,6 +15,46 @@ const distance = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
 test.describe('clothes in the box (desktop)', () => {
   test.skip(({ isMobile }) => isMobile, 'mouse and keyboard');
+
+  test('the pack can be picked up anywhere, clear film included, and moved', async ({ page }) => {
+    await openSite(page, '?jump=overhead');
+    await waitForState(page, 'overhead');
+    // The film point nearest the middle: pulled by a corner, a heavy sheet mostly swings round rather than slides
+    const box = await page.evaluate(() => window.__parcel.garmentBox('pack'));
+    const middle = [box.left + box.width / 2, box.top + box.height / 2];
+    const [film] = (await filmPoints(page, await gridOver(page, 'pack')))
+      .sort((a, b) => Math.hypot(a.x - middle[0], a.y - middle[1]) - Math.hypot(b.x - middle[0], b.y - middle[1]));
+    expect(film, 'a point over clear film').toBeDefined();
+    expect(await page.evaluate(([x, y]) => window.__parcel.pick(x, y), [film.x, film.y])).toBe('pack');
+    const before = await centreOf(page, 'pack');
+    await dragMouse(page, film, { x: film.x + 40, y: film.y });
+    await waitForSettled(page);
+    expect((await centreOf(page, 'pack'))[0] - before[0]).toBeGreaterThan(10);
+  });
+
+  test('while the clothes show, the drawn pack stands in for the CSS one; restart puts it back', async ({ page }) => {
+    await openSite(page, '?jump=overhead');
+    await waitForState(page, 'overhead');
+    const opacity = () => page.$eval('.pack', (el) => getComputedStyle(el).opacity);
+    expect(await opacity()).toBe('0');
+    expect(await page.$eval('.pack-img', (img) => img.alt), 'screen readers still hear it').not.toBe('');
+    const home = await centreOf(page, 'pack');
+    const grip = await pointOn(page, 'pack');
+    await dragMouse(page, grip, { x: grip.x + 40, y: grip.y });
+    await waitForSettled(page);
+    await page.click('#restart');
+    await waitForState(page, 'sealed');
+    expect(await opacity()).toBe('1');
+    expect(await centreOf(page, 'pack')).toEqual(home);
+  });
+
+  test('the keyboard offers to move the garments, never the pack', async ({ page }) => {
+    await openSite(page, '?jump=overhead');
+    await waitForState(page, 'overhead');
+    const labels = await page.$$eval('#clothes-controls button', (buttons) => buttons.map((b) => b.getAttribute('aria-label')));
+    expect(labels).toHaveLength(8);
+    labels.forEach((label) => expect(label).not.toMatch(/pack/i));
+  });
 
   test('the open hand shows exactly where cloth is visible, never over a transparent margin', async ({ page }) => {
     await openSite(page, '?jump=overhead');
@@ -174,7 +214,7 @@ test.describe('clothes in the box (desktop)', () => {
     const inBox = ([x, y]) => x > 0 && x < 420 && y > 0 && y < 300;
     const { garments } = await clothesOf(page);
     expect(inBox(garments.find((g) => g.id === point.id).centre)).toBe(false);
-    await expect(shownKeys(page)).toHaveCount(garments.filter((g) => inBox(g.centre)).length);
+    await expect(shownKeys(page)).toHaveCount(garments.filter((g) => g.id !== 'pack' && inBox(g.centre)).length);
   });
 
   test('losing the graphics mid-move does not jam the keyboard moves', async ({ page }) => {
@@ -225,6 +265,19 @@ test.describe('clothes in the box (desktop)', () => {
 
 test.describe('without WebGL', () => {
   test.skip(({ isMobile }) => isMobile, 'desktop');
+
+  test('the CSS pack stays, flat, as the fallback', async ({ page }) => {
+    await page.addInitScript(() => {
+      const original = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function getContext(type, ...rest) {
+        return type === 'webgl2' ? null : original.call(this, type, ...rest);
+      };
+    });
+    await openSite(page, '?jump=overhead');
+    await waitForState(page, 'overhead');
+    await expect(page.locator('.pack')).toBeVisible();
+    await expect(page.locator('.pack-edge')).toHaveCount(0);
+  });
 
   test('the clothes are skipped and the booklet opens straight after the reveal', async ({ page }) => {
     await page.addInitScript(() => {

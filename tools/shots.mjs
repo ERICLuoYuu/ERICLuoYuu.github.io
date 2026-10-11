@@ -26,7 +26,12 @@ try {
     await page.waitForFunction(() => window.__parcel?.state === 'overhead', null, { timeout: 20_000 });
     await page.waitForTimeout(1500); // the light comes on
     await page.screenshot({ path: `${out}/${name}-overhead.png` });
-    await page.screenshot({ path: `${out}/${name}-pack.png`, clip: padded(await page.locator('.pack-body').boundingBox()) });
+    // The CSS pack may be handed over (transparent): clip the close-up to the drawn pack when there is one.
+    const packBox = await page.evaluate(() => {
+      const drawn = window.__parcel.garmentBox('pack');
+      return drawn ?? document.querySelector('.pack-body').getBoundingClientRect().toJSON();
+    });
+    await page.screenshot({ path: `${out}/${name}-pack.png`, clip: padded({ x: packBox.left, y: packBox.top, width: packBox.width, height: packBox.height }) });
     console.log(`${out}/${name}-*.png`, JSON.stringify(await page.evaluate(() => window.__parcel.clothes())));
     await page.close();
   }

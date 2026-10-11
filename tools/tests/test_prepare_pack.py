@@ -74,7 +74,7 @@ def test_relief_shade_is_faint_and_only_on_the_pack():
     assert (shade[alpha <= 0.01, 3] == 0).all()
 
 
-def test_cli_writes_the_pack_and_its_shade(tmp_path, capsys):
+def test_cli_writes_the_pack_its_shade_and_its_relief(tmp_path, capsys):
     source = tmp_path / "art.png"
     Image.fromarray(artwork().astype(np.uint8)).save(source)
     assert pp.main([str(source), str(tmp_path / "out"), "--speck", "50", "--height", "60"]) == 0
@@ -82,6 +82,8 @@ def test_cli_writes_the_pack_and_its_shade(tmp_path, capsys):
     shade = Image.open(tmp_path / "out" / "vacuum-pack-shade.webp")
     assert pack.mode == "RGBA" and pack.height == 60 and shade.size == pack.size
     assert "aspect" in capsys.readouterr().out
+    relief = Image.open(tmp_path / "out" / "vacuum-pack-relief.webp")
+    assert relief.size == pack.size
 
 
 def test_cli_reports_a_bad_input(tmp_path, capsys):
@@ -89,3 +91,12 @@ def test_cli_reports_a_bad_input(tmp_path, capsys):
     Image.new("RGB", (30, 30), (200, 200, 200)).save(source)
     assert pp.main([str(source), str(tmp_path / "out")]) == 2
     assert "white canvas" in capsys.readouterr().err
+
+
+def test_relief_map_rises_over_solids_and_is_flat_off_the_pack():
+    _, alpha, solid = cut()
+    level = pp.relief_map(alpha, solid)
+    assert level.dtype == np.uint8 and level.shape == alpha.shape
+    assert level.max() == 255
+    assert (level[alpha <= 0.01] == 0).all()
+    assert level[solid].mean() > level[(alpha > 0.01) & ~solid].mean() + 20

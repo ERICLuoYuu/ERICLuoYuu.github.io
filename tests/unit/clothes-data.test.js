@@ -14,9 +14,10 @@ const LENGTH = {
 
 test('garments.json lists the eight garments with textures, grids and materials', async () => {
   const data = await readJson('assets/clothes/garments.json');
+  const garments = data.garments.filter((g) => g.kind !== 'film');
   assert.equal(data.spacing, 6);
-  assert.deepEqual(data.garments.map((g) => g.id), EXPECTED);
-  await Promise.all(data.garments.map(async (g) => {
+  assert.deepEqual(garments.map((g) => g.id), EXPECTED);
+  await Promise.all(garments.map(async (g) => {
     const { size } = await stat(new URL(g.texture, ROOT));
     assert.ok(size > 1000, `${g.texture} exists`);
     assert.equal(g.grid.cols, Math.ceil(g.size[0] / data.spacing));
@@ -75,4 +76,20 @@ test('simulating everything at once costs no more than the spec allows', async (
   const particles = data.garments.map(buildMesh).reduce((sum, m) => sum + m.count, 0);
   // spec B3: within 10 % of 5,000 particles × 10 substeps
   assert.ok(particles * DEFAULTS.substeps <= 55000, `${particles} particles × ${DEFAULTS.substeps} substeps`);
+});
+
+test('the pack is the last body: a heavy, stiff film the size of the pack in the box', async () => {
+  const { CONTENTS } = await import('../../js/scene/geometry.js');
+  const data = await readJson('assets/clothes/garments.json');
+  const pile = await readJson('assets/clothes/pile.json');
+  const pack = data.garments.at(-1);
+  assert.deepEqual([pack.id, pack.kind], ['pack', 'film']);
+  assert.equal(data.garments.filter((g) => g.kind === 'film').length, 1, 'one film body');
+  assert.deepEqual(pack.size, [CONTENTS.pack.width, CONTENTS.pack.height]);
+  assert.ok(pack.material.mass >= 4, 'heavy');
+  assert.ok(pack.material.bendCompliance <= 1e-6, 'stiff');
+  assert.deepEqual(pack.hold, { radius: 30, lift: 6 });
+  const gap = Math.hypot(pack.size[0] / pack.grid.cols, pack.size[1] / pack.grid.rows) / 2;
+  assert.ok(gap < pile.thickness, `a cell's middle lies ${gap.toFixed(2)} from its particles`);
+  for (const path of [pack.texture, pack.relief]) assert.ok((await stat(new URL(path, ROOT))).size > 1000, `${path} exists`);
 });
