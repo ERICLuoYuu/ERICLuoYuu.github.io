@@ -96,6 +96,17 @@ test.describe('clothes in the box (desktop)', () => {
     expect(mean(light, 'after') - mean(dark, 'after'), 'they still differ through the film').toBeGreaterThan(0.3 * contrast);
   });
 
+  test('a garment whose relief is missing is still drawn, and the clothes still work', async ({ page }) => {
+    await page.route('**/assets/clothes/qipao-relief.webp', (route) => route.fulfill({ status: 404, body: '' }));
+    const warnings = [];
+    page.on('console', (m) => { if (m.type() === 'warning') warnings.push(m.text()); });
+    await page.goto('/?jump=overhead');
+    await waitForState(page, 'overhead');
+    expect((await clothesOf(page)).enabled).toBe(true);
+    expect(warnings.join('\n')).toContain('qipao-relief.webp');
+    expect(await page.evaluate(() => window.__parcel.garmentBox('qipao'))).not.toBeNull();
+  });
+
   test('the keyboard offers to move the garments, never the pack', async ({ page }) => {
     await openSite(page, '?jump=overhead');
     await waitForState(page, 'overhead');

@@ -6,6 +6,18 @@ import { buildMesh } from '../../js/cloth/mesh.js';
 const ROOT = new URL('../../', import.meta.url);
 const readJson = async (path) => JSON.parse(await readFile(new URL(path, ROOT), 'utf8'));
 
+/** Width and height of a WebP file, read from its header. */
+function webpSize(buffer) {
+  const chunk = buffer.toString('ascii', 12, 16);
+  if (chunk === 'VP8X') return [1 + buffer.readUIntLE(24, 3), 1 + buffer.readUIntLE(27, 3)];
+  if (chunk === 'VP8 ') return [buffer.readUInt16LE(26) & 0x3fff, buffer.readUInt16LE(28) & 0x3fff];
+  if (chunk === 'VP8L') {
+    const bits = buffer.readUInt32LE(21);
+    return [1 + (bits & 0x3fff), 1 + ((bits >> 14) & 0x3fff)];
+  }
+  throw new Error(`not a WebP file (${chunk})`);
+}
+
 const EXPECTED = ['qipao', 'blouse', 'mamianqun', 'tee-white', 'tee-breton', 'slip-skirt', 'ruched-top', 'floral-skirt'];
 // How long each garment is on the figure in the pack (spec Revision B, B2), in parcel units.
 const LENGTH = {
@@ -92,4 +104,27 @@ test('the pack is the last body: a heavy, stiff film the size of the pack in the
   const gap = Math.hypot(pack.size[0] / pack.grid.cols, pack.size[1] / pack.grid.rows) / 2;
   assert.ok(gap < pile.thickness, `a cell's middle lies ${gap.toFixed(2)} from its particles`);
   for (const path of [pack.texture, pack.relief]) assert.ok((await stat(new URL(path, ROOT))).size > 1000, `${path} exists`);
+});
+
+test('redrawn garments have an aligned relief map, a signature and core cells inside their cloth', async () => {
+  const data = await readJson('assets/clothes/garments.json');
+  const redrawn = data.garments.filter((g) => g.relief && g.kind !== 'film');
+  assert.ok(redrawn.length >= 1, 'at least the qipao is redrawn');
+  await Promise.all(redrawn.map(async (g) => {
+    const [colour, relief] = await Promise.all([g.texture, g.relief].map((p) => readFile(new URL(p, ROOT))));
+    assert.deepEqual(webpSize(relief), webpSize(colour), `${g.id}: relief and colour line up`);
+    webpSize(colour).forEach((px, k) => assert.ok(Math.abs(px - g.size[k] * g.pxPerUnit) <= 1, `${g.id}: ${g.pxPerUnit} px per unit`));
+    g.signature.forEach((v) => assert.ok(v >= 0 && v <= 1, `${g.id}: signature inside the picture`));
+    assert.equal(g.grid.core.length, g.grid.cells.length);
+    [...g.grid.core].forEach((c, k) => assert.ok(c === '0' || g.grid.cells[k] === '1', `${g.id}: core cell ${k} is cloth`));
+    assert.ok(Number.isFinite(g.material.bump), `${g.id}.bump`);
+  }));
+});
+
+test('all garment pictures together stay within 3 MB', async () => {
+  const data = await readJson('assets/clothes/garments.json');
+  const paths = data.garments.filter((g) => g.kind !== 'film').flatMap((g) => [g.texture, g.relief].filter(Boolean));
+  const sizes = await Promise.all(paths.map(async (p) => (await stat(new URL(p, ROOT))).size));
+  const total = sizes.reduce((a, b) => a + b, 0);
+  assert.ok(total <= 3 * 2 ** 20, `${(total / 2 ** 20).toFixed(2)} MB`);
 });

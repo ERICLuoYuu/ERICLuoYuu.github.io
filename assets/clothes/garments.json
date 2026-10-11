@@ -1,33 +1,40 @@
 {
  "spacing": 6,
- "pxPerUnit": 2.4,
+ "pxPerUnit": 4,
  "garments": [
   {
    "id": "qipao",
    "label": "qipao",
    "texture": "assets/clothes/qipao.webp",
-   "pxPerUnit": 6.0759,
+   "relief": "assets/clothes/qipao-relief.webp",
+   "pxPerUnit": 10.1266,
    "size": [
     75.05,
     158.0
    ],
+   "signature": [
+    0.5,
+    0.02
+   ],
    "grid": {
     "cols": 13,
     "rows": 27,
-    "cells": "000011111000000111111111001111111111111111111111111101111111111100011111111100001111111110000111111111000011111111100000111111100000011111110000001111111000000111111100000011111110000011111111100001111111110000111111111000011111111100001111111110000111111111000011111111100001111111110000111111111000011111111100001111111110000111111111000011111111100"
+    "cells": "000011111000000111111111000111111111110011111111111000111111111000011111111100001111111110000011111110000001111111000000111111100000011111110000001111111000001111111110000111111111000011111111100001111111110000111111111000011111111100001111111110000111111111000011111111100001111111110000111111111000011111111100001111111110000011111110000001111111000",
+    "core": "000001110000000111111111000111111111110001111111110000011111110000001111111000000111111100000011111110000001111111000000111111100000011111110000001111111000000111111100000011111110000011111111100001111111110000111111111000001111111000000111111100000011111110000001111111000000111111100000011111110000001111111000000111111100000011111110000001111111000"
    },
    "material": {
     "stretchCompliance": 0,
-    "bendCompliance": 0.0003,
+    "bendCompliance": 0.0001,
     "friction": 0.35,
-    "sheen": 0.75
+    "sheen": 0.6,
+    "bump": 1.6
    }
   },
   {
+   "pxPerUnit": 6.6506,
    "id": "blouse",
    "label": "mandarin-collar blouse",
    "texture": "assets/clothes/blouse.webp",
-   "pxPerUnit": 6.6506,
    "size": [
     108.26,
     83.0
@@ -45,10 +52,10 @@
    }
   },
   {
+   "pxPerUnit": 4.9512,
    "id": "mamianqun",
    "label": "horse-face skirt",
    "texture": "assets/clothes/mamianqun.webp",
-   "pxPerUnit": 4.9512,
    "size": [
     135.73,
     127.0
@@ -66,10 +73,10 @@
    }
   },
   {
+   "pxPerUnit": 7.2289,
    "id": "tee-white",
    "label": "white T-shirt",
    "texture": "assets/clothes/tee-white.webp",
-   "pxPerUnit": 7.2289,
    "size": [
     96.28,
     83.0
@@ -87,10 +94,10 @@
    }
   },
   {
+   "pxPerUnit": 7.5181,
    "id": "tee-breton",
    "label": "striped T-shirt",
    "texture": "assets/clothes/tee-breton.webp",
-   "pxPerUnit": 7.5181,
    "size": [
     95.77,
     83.0
@@ -108,10 +115,10 @@
    }
   },
   {
+   "pxPerUnit": 6.3379,
    "id": "slip-skirt",
    "label": "satin slip skirt",
    "texture": "assets/clothes/slip-skirt.webp",
-   "pxPerUnit": 6.3379,
    "size": [
     75.74,
     103.0
@@ -129,10 +136,10 @@
    }
   },
   {
+   "pxPerUnit": 8.2909,
    "id": "ruched-top",
    "label": "red ruched top",
    "texture": "assets/clothes/ruched-top.webp",
-   "pxPerUnit": 8.2909,
    "size": [
     63.68,
     55.0
@@ -150,10 +157,10 @@
    }
   },
   {
+   "pxPerUnit": 6.9903,
    "id": "floral-skirt",
    "label": "floral midi skirt",
    "texture": "assets/clothes/floral-skirt.webp",
-   "pxPerUnit": 6.9903,
    "size": [
     78.97,
     103.0
