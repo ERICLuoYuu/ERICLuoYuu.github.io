@@ -31,6 +31,10 @@ export default {
     tapeLabel: 'Packing tape. Hold the right arrow key to cut along it.',
     questionLabel: 'Look inside the box',
     bookLabel: 'Open the little book',
+    clothesHint: 'Move the clothes aside to find what’s underneath.',
+    moveAside: 'Move the {garment} aside', // a keyboard button per garment
+    movedAside: 'The {garment} is out of the way.',
+    bookUncovered: 'The little book is uncovered.',
     bookTitle: 'About me',
     ownerLine: 'this little book belongs to',
     ownerName: '[your name]',

@@ -1,11 +1,13 @@
 import { test, expect } from '@playwright/test';
 import {
-  openSite, stateOf, progressOf, bookOf, waitForState, mouseCutAll, clearClothes,
+  openSite, stateOf, progressOf, bookOf, waitForState, mouseCutAll,
 } from './helpers.js';
+import { clearWithKeyboard, tabToBooklet } from './clothes-helpers.js';
 
 test.skip(({ isMobile }) => isMobile, 'keyboard and preference checks run on desktop');
 
 test('the whole experience works with the keyboard alone', async ({ page }) => {
+  test.setTimeout(150_000); // the clothes are moved aside one by one
   await openSite(page);
   await page.keyboard.press('Tab');
   await expect(page.locator('#cut-slider')).toBeFocused();
@@ -19,7 +21,9 @@ test('the whole experience works with the keyboard alone', async ({ page }) => {
 
   await page.keyboard.press('Enter');
   await waitForState(page, 'overhead');
-  await expect(page.locator('.book-top')).toBeFocused();
+  await expect(page.locator(':focus')).toHaveAttribute('aria-label', /^Move the .+ aside$/);
+  await clearWithKeyboard(page);
+  await tabToBooklet(page);
 
   await page.keyboard.press('Enter');
   await waitForState(page, 'reading', 15_000);
@@ -53,6 +57,7 @@ test.describe('reduced motion', () => {
   test.beforeEach(async ({ page }) => { await page.emulateMedia({ reducedMotion: 'reduce' }); });
 
   test('every stage is still reachable, with instant page turns', async ({ page }) => {
+    test.setTimeout(120_000); // the clothes are moved aside one by one
     const problems = await openSite(page);
     const floatAnimation = await page.$eval('.question-glyph', (el) => getComputedStyle(el).animationName);
     expect(floatAnimation).toBe('none');
@@ -60,7 +65,7 @@ test.describe('reduced motion', () => {
     await waitForState(page, 'dark');
     await page.click('.question');
     await waitForState(page, 'overhead');
-    await clearClothes(page);
+    await clearWithKeyboard(page);
     await page.click('.book-top');
     await waitForState(page, 'reading', 5000);
     await page.click('#reader-next');

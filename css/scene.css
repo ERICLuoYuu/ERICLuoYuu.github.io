@@ -283,10 +283,11 @@ body[data-state="dark"] .floor-glow { opacity: 1; }
 }
 .book-title { font-size: calc(var(--bw) * .1px); }
 
-body[data-state="overhead"] .book3d:hover,
-body[data-state="overhead"] .book3d:focus-within { --lift: 14px; }
-body[data-state="overhead"] .book3d:hover .book-shadow,
-body[data-state="overhead"] .book3d:focus-within .book-shadow { transform: translate3d(16px, 20px, .2px); opacity: .8; }
+/* The booklet only lifts once the clothes are off it (.is-reachable, set by flow.js). */
+body[data-state="overhead"] .stage:not(.over-garment):not(.is-grabbing) .book3d.is-reachable:hover,
+body[data-state="overhead"] .book3d.is-reachable:focus-within { --lift: 14px; }
+body[data-state="overhead"] .stage:not(.over-garment):not(.is-grabbing) .book3d.is-reachable:hover .book-shadow,
+body[data-state="overhead"] .book3d.is-reachable:focus-within .book-shadow { transform: translate3d(16px, 20px, .2px); opacity: .8; }
 
 /* ─── the question mark (a billboard that always faces the camera) ──────── */
 .question {
@@ -337,7 +338,8 @@ body[data-state="dark"] .question-glyph { animation: question-pop .7s cubic-bezi
   .stage.over-garment, .stage.over-garment * { cursor: var(--cursor-grab, grab) !important; }
   .stage.is-grabbing, .stage.is-grabbing * { cursor: var(--cursor-grabbing, grabbing) !important; }
 }
-body:not([data-state="overhead"]) .book-top { pointer-events: none; }
+body:not([data-state="overhead"]) .book-top,
+.book3d:not(.is-reachable) .book-top { pointer-events: none; }
 /* Over or under a garment, the booklet must not lift as if the pointer were on it. */
 .stage.over-garment .book-top,
 .stage.is-grabbing .book-top { pointer-events: none; }

@@ -10,11 +10,11 @@
 
 import { buildMesh } from './mesh.js';
 import {
-  createWorld, step, isSettled, setPositions, sleepAll, grab as hold, moveGrip, release as letGo, centroid,
+  createWorld, step, isSettled, setPositions, sleepAll, centroid,
 } from './solver.js';
 import { pick } from './pick.js';
 import { bookCoverage } from './coverage.js';
-import { supportHeight, gripCluster, onPlane } from './grip.js';
+import { createHand, asideTarget, dropAt } from './hand.js';
 import { createRenderer } from './render.js';
 import { boxColliders, occluderQuads } from '../scene/solids.js';
 import { CONTENTS } from '../scene/geometry.js';
@@ -25,12 +25,9 @@ const PILE = 'assets/clothes/pile.json';
 const STEP = 1 / 60; // fixed simulation step
 const MAX_STEPS = 2; // per animation frame; a slower device sees slow motion rather than a stutter
 const BOUNDS = { min: [-700, -600, 0], max: [1200, 1000, 700] }; // the table, roughly; nothing is flung into the void
-const REACH = { min: [-600, -500], max: [1100, 900] }; // where the hand may carry a garment
-const GRIP_RADIUS = 11; // particles this close to the hit point are held
-const LIFT = 45; // the hand holds cloth this far above what lies beneath
-const MIN_HEIGHT = 60;
-const LOWER_RATE = 5; // per second: how quickly the hand sinks back after clearing something tall
-const ASIDE = 700; // clearAside(): far enough right to be off the box
+const CARRY_SPEED = 320; // units a second for a keyboard move...
+const CARRY_TIME = [0.8, 1.6]; // ...taking between these many seconds
+const CLEAR_SHIFT = 700; // clearAside(): far enough right to be off the box
 const CONTEXT = { alpha: true, premultipliedAlpha: true, antialias: true, depth: true, stencil: false };
 
 const DISABLED = Object.freeze({
@@ -43,6 +40,7 @@ const DISABLED = Object.freeze({
   grab() {},
   dragTo() {},
   release() {},
+  moveAside: async () => {},
   screenBox: () => null,
   coverage: () => 0,
   onSettle: () => () => {},
@@ -102,7 +100,7 @@ async function loadAssets() {
  * @param {{canvas: HTMLCanvasElement, camera: {frame(): object, onChange(fn): Function}}} options
  * @returns {Promise<object>} the layer (see the object returned at the end of createLayer)
  */
-export async function createClothes({ canvas, camera }) {
+export async function createClothes({ canvas, camera, reducedMotion = () => false }) {
   const gl = canvas.getContext('webgl2', CONTEXT);
   if (!gl) return disabled('this browser has no WebGL2.');
   let assets;
@@ -112,13 +110,13 @@ export async function createClothes({ canvas, camera }) {
     return disabled(`the clothes could not be loaded (${err.message}).`);
   }
   try {
-    return createLayer({ canvas, gl, camera, assets });
+    return createLayer({ canvas, gl, camera, assets, reducedMotion });
   } catch (err) {
     return disabled(`the clothes could not be drawn (${err.message}).`);
   }
 }
 
-function createLayer({ canvas, gl, camera, assets }) {
+function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
   const { data, pile, meshes, images } = assets;
   const colliders = boxColliders();
   const world = createWorld({
@@ -142,9 +140,9 @@ function createLayer({ canvas, gl, camera, assets }) {
   let backlog = 0;
   let substeps = world.settings.substeps;
   let cost = 0; // smoothed milliseconds per step
-  let held = null; // { garment, base, height, want, sx, sy }
 
   const viewport = () => ({ width: canvas.clientWidth || innerWidth, height: canvas.clientHeight || innerHeight });
+  const hand = createHand({ world, colliders, ray: (sx, sy) => screenRay(camera.frame(), viewport(), sx, sy) });
   const active = () => world.grip !== null || !isSettled(world);
 
   function schedule() {
@@ -205,7 +203,7 @@ function createLayer({ canvas, gl, camera, assets }) {
     if (active()) {
       const elapsed = last ? Math.min(0.25, (now - last) / 1000) : STEP;
       last = now;
-      lowerHand(elapsed);
+      hand.advance(elapsed);
       backlog += elapsed;
       let steps = 0;
       while (backlog >= STEP && steps < MAX_STEPS) {
@@ -227,62 +225,47 @@ function createLayer({ canvas, gl, camera, assets }) {
 
   // ─── the hand ────────────────────────────────────────────────────────────
 
-  const clampReach = ([x, y, z]) => [
-    Math.min(REACH.max[0], Math.max(REACH.min[0], x)),
-    Math.min(REACH.max[1], Math.max(REACH.min[1], y)),
-    z,
-  ];
-
-  /** Put the hand where the pointer's line of sight meets its height; rise at once if something taller is below. */
-  function aimHand() {
-    const ray = screenRay(camera.frame(), viewport(), held.sx, held.sy);
-    let target = onPlane(ray, held.height);
-    if (!target) return;
-    const want = Math.max(held.base, supportHeight(world, colliders, target[0], target[1], { skip: held.garment }) + LIFT);
-    if (want > held.height) {
-      held.height = want;
-      target = onPlane(ray, want) ?? target;
-    }
-    held.want = want;
-    moveGrip(world, clampReach(target));
-  }
-
-  /** After clearing a wall or the pile, the hand sinks back smoothly. */
-  function lowerHand(elapsed) {
-    if (!held || held.height <= held.want + 0.01) return;
-    held.height -= (held.height - held.want) * Math.min(1, elapsed * LOWER_RATE);
-    aimHand();
-  }
-
   function grab(hit) {
     if (!hit) return;
-    letGo(world);
-    hold(world, hit.garment, gripCluster(world, hit, GRIP_RADIUS), hit.point);
     const { x, y } = projectPoint(camera.frame(), viewport(), hit.point);
-    held = { garment: hit.garment, base: Math.max(hit.point[2] + LIFT, MIN_HEIGHT), height: hit.point[2], want: 0, sx: x, sy: y };
-    aimHand();
+    hand.grab(hit, x, y);
     schedule();
   }
 
   function dragTo(sx, sy) {
-    if (!held) return;
-    held.sx = sx;
-    held.sy = sy;
-    aimHand();
+    hand.dragTo(sx, sy);
     schedule();
   }
 
   function release() {
-    if (!held) return;
-    letGo(world);
-    held = null;
+    hand.release();
     schedule();
+  }
+
+  /**
+   * Carry garment g out of the box, beyond the nearest of the right, front
+   * and back walls (keyboard moves). With reduced motion it is simply put
+   * down there. Resolves once it is let go.
+   */
+  function moveAside(g) {
+    const to = asideTarget(world, g);
+    if (reducedMotion()) {
+      hand.drop();
+      dropAt(world, colliders, g, to);
+      schedule();
+      return Promise.resolve();
+    }
+    const [x, y] = centroid(world, g);
+    const duration = Math.min(CARRY_TIME[1], Math.max(CARRY_TIME[0], Math.hypot(to[0] - x, to[1] - y) / CARRY_SPEED));
+    const moved = hand.carry(g, to, { duration });
+    schedule();
+    return moved;
   }
 
   // ─── whole-pile changes ──────────────────────────────────────────────────
 
   function place(shift) {
-    release();
+    hand.drop();
     pile.garments.forEach(({ positions }, g) => {
       setPositions(world, g, Float32Array.from(positions, (v, i) => (i % 3 === 0 ? v + shift : v)));
     });
@@ -322,17 +305,17 @@ function createLayer({ canvas, gl, camera, assets }) {
     enabled: true,
     garments: Object.freeze(data.garments.map(({ id, label }) => Object.freeze({ id, label }))),
 
-    /** Show or hide the canvas (it fades by CSS). Hiding drops anything held. */
+    /** Show or hide the canvas. Hiding drops anything held. */
     show(on) {
       visible = Boolean(on);
       canvas.classList.toggle('is-visible', visible);
-      if (!visible) release();
+      if (!visible) hand.drop();
       if (visible) resize();
     },
     /** The packed pile, exactly as it was on arrival. */
     reset: () => place(0),
     /** Every garment off to the side of the box (previews and tests). */
-    clearAside: () => place(ASIDE),
+    clearAside: () => place(CLEAR_SHIFT),
 
     /** The garment under screen point (sx, sy), in CSS pixels, or null. */
     pickAt(sx, sy) {
@@ -342,6 +325,7 @@ function createLayer({ canvas, gl, camera, assets }) {
     grab,
     dragTo,
     release,
+    moveAside,
 
     /** Garment g's outline on screen as a box in CSS pixels. */
     screenBox(g) {
@@ -371,11 +355,12 @@ function createLayer({ canvas, gl, camera, assets }) {
       enabled: true,
       visible,
       settled: !active(),
-      held: held ? held.garment : null,
+      held: hand.garment,
+      grip: world.grip ? [...world.grip.to] : null,
       awake: world.awake.reduce((sum, a) => sum + a, 0),
       substeps,
       coverage: bookCoverage(world, CONTENTS.book),
-      garments: data.garments.map(({ id }, g) => ({ id, centre: centroid(world, g).map(Math.round) })),
+      garments: data.garments.map(({ id }, g) => ({ id, awake: world.awake[g] === 1, centre: centroid(world, g).map(Math.round) })),
     }),
     /** Screen position of a parcel point (CSS pixels). */
     project: (point) => projectPoint(camera.frame(), viewport(), point),

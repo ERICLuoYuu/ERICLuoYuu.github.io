@@ -18,6 +18,7 @@ import { createControls } from './ui/controls.js';
 import { createFlow } from './flow.js';
 import { createClothes } from './cloth/layer.js';
 import { createClothesInput } from './cloth/interaction.js';
+import { createClothesKeys } from './cloth/keyboard.js';
 
 /** Built-in art used whenever a configured file cannot be loaded. */
 const FALLBACK = {
@@ -71,6 +72,7 @@ function applyText(config, dom) {
   document.title = meta.title;
   document.querySelector('meta[name="description"]')?.setAttribute('content', meta.description);
   $('loader-text').textContent = text.loading;
+  dom.clothesHint.textContent = text.clothesHint ?? '';
   dom.slider.setAttribute('aria-label', text.tapeLabel);
   $('slider-text').textContent = text.keyboardCut;
   $('reader-close').setAttribute('aria-label', text.closeBook);
@@ -161,14 +163,21 @@ function wireReader(app, flow) {
   });
 }
 
-/** States in which the clothes are in view; during the reveal they fade in once the light starts to rise. */
+/** States in which the clothes are in view; during the reveal they appear once the light starts to rise. */
 const CLOTHES_VISIBLE = new Set(['overhead', 'lifting', 'reading', 'closing']);
 const CLOTHES_REVEAL_DELAY = 600;
+const NO_KEYS = Object.freeze({ enable() {}, disable() {}, layout() {}, first: () => null });
 
-function wireClothes({ machine, clothes, dom }) {
+/** Pointer and keyboard input for the clothes, and when they are shown. */
+function wireClothes(app, flow) {
+  const { machine, clothes, dom } = app;
   const input = clothes.enabled
     ? createClothesInput({ stage: dom.stage, clothes, canInteract: () => machine.state === 'overhead' })
     : { cancel() {} };
+  app.clothesKeys = clothes.enabled
+    ? createClothesKeys({ host: $('clothes-controls'), clothes, text: app.text, announce: app.announce })
+    : NO_KEYS;
+  flow.attachClothes();
   let timer = 0;
   machine.subscribe((to) => {
     clearTimeout(timer);
@@ -203,7 +212,7 @@ async function start() {
   const config = await loadConfig();
   const dom = {
     stage: $('stage'), experience: $('experience'), reader: $('reader'), slider: $('cut-slider'),
-    instruction: $('instruction'),
+    instruction: $('instruction'), clothesHint: $('clothes-hint'),
   };
   applyRootStyles(config);
   applyText(config, dom);
@@ -271,7 +280,7 @@ async function start() {
   });
 
   const progressBar = $('loader-progress');
-  const clothesTask = createClothes({ canvas: $('clothes'), camera }); // always resolves, disabled if it must
+  const clothesTask = createClothes({ canvas: $('clothes'), camera, reducedMotion: prefersReducedMotion }); // always resolves
   resolved = await preload({
     images: imagePlan(config),
     tasks: [
@@ -281,7 +290,7 @@ async function start() {
     onProgress: (f) => { progressBar.style.transform = `scaleX(${f.toFixed(3)})`; },
   });
   app.clothes = await clothesTask;
-  wireClothes(app);
+  wireClothes(app, flow);
   if (config.handwriting.font) document.documentElement.classList.add('owner-hand');
 
   applyArt(scene.parcel, { ...config.art, ...resolved }, { grain: resolved.grain });
@@ -306,8 +315,13 @@ async function start() {
     progress: () => app.cutting.progress(),
     sound: () => sound.status(),
     book: () => bookView.status(),
-    clothes: () => app.clothes.status(),
-    clearClothes: () => app.clothes.clearAside(),
+    clothes: () => ({ ...app.clothes.status(), reachable: flow.bookReachable() }),
+    /** The id of the garment on top at screen point (x, y), or null. */
+    pick: (x, y) => {
+      const hit = app.clothes.pickAt(x, y);
+      return hit ? app.clothes.garments[hit.garment].id : null;
+    },
+    garmentBox: (id) => app.clothes.screenBox(app.clothes.garments.findIndex((g) => g.id === id)),
     project: (point) => app.clothes.project(point),
   };
 }

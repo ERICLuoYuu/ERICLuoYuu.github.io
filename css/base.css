@@ -112,6 +112,31 @@ body:not([data-state="sealed"]):not([data-state="cutting"]) .instruction {
   opacity: 0; transform: translateX(-50%) translateY(10px) rotate(-1.5deg);
 }
 
+/* "Move the clothes aside…": shown while the clothes hide the booklet */
+.clothes-hint {
+  position: fixed; left: 50%; bottom: max(18px, 4vh); z-index: 5;
+  transform: translateX(-50%) rotate(-1deg);
+  margin: 0; width: max-content; max-width: calc(100vw - 32px);
+  padding: 2px 14px 4px; border-radius: 999px;
+  background: rgba(251, 243, 226, .82);
+  font-size: clamp(20px, 2.8vw, 28px); line-height: 1.15; text-align: center;
+  color: var(--ink);
+  pointer-events: none;
+}
+.clothes-hint[hidden] { display: none; }
+
+/* One keyboard button per garment, laid over it (js/cloth/keyboard.js).
+   Invisible to the mouse: pointers pick the cloth itself. */
+.clothes-controls { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.clothes-key {
+  position: absolute;
+  margin: 0; padding: 0; border: 0; border-radius: 22px;
+  background: transparent;
+  pointer-events: none;
+}
+.clothes-key[hidden] { display: none; }
+.clothes-key:focus-visible { outline: 3px dashed var(--focus); outline-offset: 4px; }
+
 .cut-slider {
   position: fixed; left: 50%; bottom: max(4px, 2vh); z-index: 6;
   transform: translateX(-50%);

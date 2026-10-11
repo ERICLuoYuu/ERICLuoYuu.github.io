@@ -2,12 +2,19 @@
  * The story beats: open the box, reveal the inside, open and close the book,
  * restart. Each busy beat runs through machine.perform(), which refuses to
  * start while another beat is still running.
+ *
+ * Inside the box the clothes lie on the booklet. It stays out of reach — no
+ * clicks, no hover lift, no tab stop — until the visitor has moved enough of
+ * them aside (coverage.isBookUncovered), and is locked again if they pile
+ * clothes back on it. The clothes arrive after the flow is created
+ * (app.clothes, app.clothesKeys), so they are looked up when needed.
  */
 
 import { prefersReducedMotion as reduced, motionMs } from './core/env.js';
 import { wait } from './core/tween.js';
 import { screenPoint } from './scene/parcel.js';
 import { computeBookLayout } from './book/layout.js';
+import { isBookUncovered } from './cloth/coverage.js';
 
 const FLAP_SOUNDS = [0, 0.13, 0.4, 0.52];
 
@@ -24,8 +31,48 @@ export function createFlow(app) {
   }
 
   const focusIfKeyboard = (el) => {
-    if (app.isKeyboardUser()) el.focus({ preventScroll: true });
+    if (el && app.isKeyboardUser()) el.focus({ preventScroll: true });
   };
+
+  // ─── the booklet under the clothes ───────────────────────────────────────
+
+  const hasClothes = () => Boolean(app.clothes?.enabled);
+  let reachable = true;
+
+  /** Booklet reachable or not: its tab stop, hover lift and the hint follow. */
+  function setReachable(on) {
+    reachable = on;
+    const overhead = machine.state === 'overhead';
+    scene.book.el.classList.toggle('is-reachable', on);
+    scene.book.button.tabIndex = on && overhead ? 0 : -1;
+    dom.clothesHint.hidden = on || !overhead || !hasClothes();
+  }
+
+  /** Looking down into the box: lock the booklet if the clothes hide it, and offer the keyboard moves. */
+  function arrive() {
+    if (!hasClothes()) {
+      setReachable(true);
+      return;
+    }
+    setReachable(isBookUncovered(app.clothes.coverage(), false));
+    app.clothesKeys.enable();
+  }
+
+  /** After the clothes come to rest: has the booklet been uncovered, or buried again? */
+  function updateBook() {
+    if (!hasClothes() || machine.state !== 'overhead') return;
+    app.clothesKeys.layout();
+    const now = isBookUncovered(app.clothes.coverage(), reachable);
+    if (now === reachable) return;
+    setReachable(now);
+    announce(now ? text.bookUncovered : text.clothesHint);
+  }
+
+  /** Called once the clothes layer exists. */
+  function attachClothes() {
+    reachable = !hasClothes();
+    if (hasClothes()) app.clothes.onSettle(updateBook);
+  }
 
   async function openBox() {
     const ran = await machine.perform('CUT_DONE', async () => {
@@ -56,15 +103,21 @@ export function createFlow(app) {
       else await camera.move('overhead', { duration: 2300 });
     }, 'REVEALED');
     if (!ran) return;
-    scene.book.button.tabIndex = 0;
-    announce('Looking down into the box: a photo and a little book.');
-    focusIfKeyboard(scene.book.button);
+    arrive();
+    if (hasClothes()) {
+      announce('Looking down into the box: a photo, a pile of clothes, and something underneath.');
+      focusIfKeyboard(reachable ? scene.book.button : app.clothesKeys.first());
+    } else {
+      announce('Looking down into the box: a photo and a little book.');
+      focusIfKeyboard(scene.book.button);
+    }
   }
 
   const bookQuad = () => scene.book.corners.map(screenPoint);
   const layoutNow = () => computeBookLayout({ width: innerWidth, height: innerHeight });
 
   async function openBook() {
+    if (!reachable) return;
     const ran = await machine.perform('OPEN_BOOK', async () => {
       sound.unlock();
       sound.play('whoosh', { volume: 0.8 });
@@ -119,6 +172,7 @@ export function createFlow(app) {
     scene.book.el.classList.remove('is-away');
     scene.question.tabIndex = -1;
     scene.book.button.tabIndex = -1;
+    app.clothesKeys?.disable();
     camera.set('threeQuarter');
     app.cutting.reset();
     app.resetInstruction();
@@ -136,13 +190,14 @@ export function createFlow(app) {
     dom.experience.inert = false;
     resetScene();
     machine.send('RESTART');
+    setReachable(!hasClothes()); // after RESTART, so no tab stop is left on the sealed parcel
     announce('A fresh, sealed parcel.');
     focusIfKeyboard(dom.slider);
   }
 
-  /** Development preview: ?jump=dark | overhead | book */
+  /** Development preview: ?jump=dark | overhead | clear | book (clear and book move the clothes off the box first) */
   async function fastForward(target) {
-    if (!['dark', 'overhead', 'book'].includes(target)) return;
+    if (!['dark', 'overhead', 'clear', 'book'].includes(target)) return;
     scene.parcel.classList.add('no-anim', 'is-cut', 'is-open');
     app.cutting.markDone();
     ['CUT_START', 'CUT_DONE', 'OPENED'].forEach((e) => machine.send(e));
@@ -152,7 +207,8 @@ export function createFlow(app) {
       camera.set('overhead');
       machine.send('REVEALED');
       scene.question.tabIndex = -1;
-      scene.book.button.tabIndex = 0;
+      if (target !== 'overhead') app.clothes?.clearAside();
+      arrive();
     }
     void scene.parcel.offsetWidth;
     await new Promise(requestAnimationFrame);
@@ -160,5 +216,8 @@ export function createFlow(app) {
     if (target === 'book') await openBook();
   }
 
-  return { openBox, reveal, openBook, closeBook, restart, fastForward, layoutNow };
+  return {
+    openBox, reveal, openBook, closeBook, restart, fastForward, layoutNow, attachClothes,
+    bookReachable: () => reachable,
+  };
 }

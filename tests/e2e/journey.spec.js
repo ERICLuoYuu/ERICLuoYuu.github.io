@@ -1,10 +1,12 @@
 import { test, expect } from '@playwright/test';
-import { openSite, stateOf, bookOf, waitForState, mouseCutAll, clearClothes } from './helpers.js';
+import { openSite, stateOf, bookOf, waitForState, mouseCutAll } from './helpers.js';
+import { clearWithMouse, bareBookletPoint } from './clothes-helpers.js';
 
 test.describe('the whole parcel, start to finish', () => {
   test.skip(({ isMobile }) => isMobile, 'desktop journey');
 
-  test('cut → dark box → overhead reveal → book → close', async ({ page }) => {
+  test('cut → dark box → overhead reveal → clothes aside → book → close', async ({ page }) => {
+    test.setTimeout(150_000); // moving the whole pile aside by hand takes a while
     const problems = await openSite(page);
     await mouseCutAll(page);
     await waitForState(page, 'dark');
@@ -17,11 +19,13 @@ test.describe('the whole parcel, start to finish', () => {
     expect(Number(light)).toBeCloseTo(1, 2);
     await expect(page.locator('.photo-card')).toBeVisible();
 
-    await clearClothes(page);
-    const bookCursor = await page.$eval('.book-top', (el) => getComputedStyle(el).cursor);
-    expect(bookCursor).toContain('hand.svg');
+    await clearWithMouse(page);
+    const bare = await bareBookletPoint(page);
+    expect(bare, 'some of the booklet is bare').not.toBeNull();
+    await page.mouse.move(bare.x, bare.y);
+    await expect.poll(() => page.$eval('.book-top', (el) => getComputedStyle(el).cursor)).toContain('hand.svg');
 
-    await page.dblclick('.book-top'); // double activation must not open twice
+    await page.mouse.dblclick(bare.x, bare.y); // double activation must not open twice
     await waitForState(page, 'reading');
     await expect(page.locator('#reader')).toBeVisible();
     await expect(page.locator('.flyer')).toBeHidden();
@@ -106,8 +110,8 @@ test.describe('phone', () => {
   });
 
   test('the book shows one readable page at a time', async ({ page }) => {
-    await openSite(page, '?jump=overhead');
-    await clearClothes(page);
+    await openSite(page, '?jump=clear');
+    await waitForState(page, 'overhead');
     await page.tap('.book-top');
     await waitForState(page, 'reading', 15_000);
     const status = await bookOf(page);
