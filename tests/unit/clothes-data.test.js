@@ -26,7 +26,7 @@ test('garments.json lists the eight garments with textures, grids and materials'
   }));
 });
 
-test('pile.json is a settled pile that hides the booklet and leaves the photo in view', async () => {
+test('pile.json is a settled pile that hides the booklet and leaves the pack in view', async () => {
   const { createWorld, setPositions } = await import('../../js/cloth/solver.js');
   const { bookCoverage } = await import('../../js/cloth/coverage.js');
   const { CONTENTS } = await import('../../js/scene/geometry.js');
@@ -53,5 +53,5 @@ test('pile.json is a settled pile that hides the booklet and leaves the photo in
     setPositions(world, g, Float32Array.from(positions));
   });
   assert.ok(bookCoverage(world, CONTENTS.book) >= 0.85, 'the booklet is hidden');
-  assert.ok(bookCoverage(world, { ...CONTENTS.photo, thickness: 1 }) <= 0.25, 'the photo stays mostly visible');
+  assert.ok(bookCoverage(world, CONTENTS.pack) <= 0.25, 'the pack stays mostly visible');
 });

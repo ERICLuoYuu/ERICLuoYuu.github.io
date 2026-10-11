@@ -17,7 +17,7 @@ test.describe('the whole parcel, start to finish', () => {
     await waitForState(page, 'overhead');
     const light = await page.$eval('.parcel', (el) => el.style.getPropertyValue('--light'));
     expect(Number(light)).toBeCloseTo(1, 2);
-    await expect(page.locator('.photo-card')).toBeVisible();
+    await expect(page.locator('.pack')).toBeVisible();
 
     await clearWithMouse(page);
     const bare = await bareBookletPoint(page);

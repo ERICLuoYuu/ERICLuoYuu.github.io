@@ -107,7 +107,7 @@ test('a keyboard move takes the garment beyond the nearest wall and lets go', as
   assert.ok(z < THICKNESS, 'on the table');
 });
 
-test('aside means over the gentle right or front flap onto the table — never left over the photo, nor up the steep back flap', () => {
+test('aside means over the gentle right or front flap onto the table — never left over the pack, nor up the steep back flap', () => {
   const left = scene(40, 150);
   const to = asideTarget(left.world, 0);
   assert.ok(to[0] > BOX.width || to[1] > BOX.depth, `right or front: ${to}`);

@@ -7,7 +7,7 @@
  * Each garment is laid out flat, folded a little (sleeves in, halves over),
  * turned and dropped onto the booklet with the same solver the site uses.
  * The result goes to assets/clothes/pile.json. If the pile does not hide the
- * booklet or covers too much of the photo, the next random seed is tried.
+ * booklet or covers too much of the pack, the next random seed is tried.
  */
 
 import { readFile, writeFile } from 'node:fs/promises';
@@ -23,7 +23,7 @@ const BOUNDS = { min: [-900, -900, 0], max: [1300, 1300, 900] };
 // Where particle centres may be laid: the walls are 2 thick, plus a particle radius and a little air.
 const INSIDE = { min: [8, 8], max: [BOX.width - 8, BOX.depth - 8] };
 const PARKED_X = -3000; // garments wait far away until it is their turn
-const TARGETS = { book: 0.88, photo: 0.2 };
+const TARGETS = { book: 0.88, pack: 0.2 };
 
 /**
  * Bottom to top. fold: [axis, at, keep] — fold everything on the far side of
@@ -160,10 +160,10 @@ async function main() {
     const started = Date.now();
     const world = buildPile(data.garments, seed);
     const book = bookCoverage(world, CONTENTS.book);
-    const photo = bookCoverage(world, { ...CONTENTS.photo, thickness: 1 });
+    const pack = bookCoverage(world, CONTENTS.pack);
     const seconds = ((Date.now() - started) / 1000).toFixed(1);
-    console.log(`seed ${seed}: booklet ${(book * 100).toFixed(0)} % hidden, photo ${(photo * 100).toFixed(0)} % covered (${seconds} s)`);
-    if (book >= TARGETS.book && photo <= TARGETS.photo) {
+    console.log(`seed ${seed}: booklet ${(book * 100).toFixed(0)} % hidden, pack ${(pack * 100).toFixed(0)} % covered (${seconds} s)`);
+    if (book >= TARGETS.book && pack <= TARGETS.pack) {
       const garments = data.garments.map(({ id }, g) => ({
         id,
         positions: Array.from(world.pos.subarray(3 * world.offsets[g], 3 * (world.offsets[g] + world.counts[g])), (v) => Math.round(v * 10) / 10),

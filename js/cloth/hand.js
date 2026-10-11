@@ -49,7 +49,7 @@ export function topParticle(world, g) {
 /**
  * Where a keyboard move takes garment g: over the nearer of the two gentle
  * flaps, right or front, onto the table beyond. Never left, where the
- * owner's photo lies, nor over the steep back flap.
+ * owner's pack lies, nor over the steep back flap.
  */
 export function asideTarget(world, g) {
   const [x, y] = centroid(world, g);

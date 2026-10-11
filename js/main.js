@@ -108,6 +108,7 @@ function imagePlan(config) {
     { key: 'paper', src: config.textures.paper },
     { key: 'grain', src: config.textures.grain },
   ];
+  if (config.photo.shade) extras.push({ key: 'photoShade', src: config.photo.shade });
   if (config.art.instruction) extras.push({ key: 'instruction', src: config.art.instruction });
   return [...art, ...extras];
 }
@@ -298,8 +299,11 @@ async function start() {
   applyArt(scene.parcel, { ...config.art, ...resolved }, { grain: resolved.grain });
   document.documentElement.style.setProperty('--art-book-cover', cssUrl(resolved.bookCover));
   document.documentElement.style.setProperty('--art-endpaper', cssUrl(resolved.endpaper));
-  scene.photo.img.src = resolved.photo;
-  scene.photo.img.alt = config.photo.alt;
+  scene.pack.img.src = resolved.photo;
+  scene.pack.img.alt = config.photo.alt;
+  scene.pack.el.style.setProperty('--pack-src', cssUrl(resolved.photo));
+  if (resolved.photoShade) scene.pack.shade.src = resolved.photoShade;
+  else scene.pack.shade.hidden = true;
   scene.questionImg.src = resolved.questionMark;
   scene.desiccant.src = resolved.desiccant;
   app.resetInstruction();

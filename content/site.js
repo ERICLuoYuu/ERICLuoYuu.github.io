@@ -41,7 +41,6 @@ export default {
     ownerName: '[your name]',
     readerHint: 'drag a page corner, or use ← →',
     readerHintTouch: 'swipe, or drag a page corner',
-    photoCaption: '', // a handwritten caption under your photo, e.g. "me, last summer"
     closeBook: 'Close the book',
     bookError: 'This book could not be opened right now. Please try again later.',
     previousPage: 'Previous page',
@@ -71,9 +70,10 @@ export default {
     instruction: '', // optional: a transparent image of your handwritten instruction
   },
 
-  /** Your picture, shown as a glossy print on the left of the box floor. */
+  /** Your picture, as a vacuum-sealed pack on the left of the box floor (tools/prepare_pack.py makes both files). */
   photo: {
-    src: 'assets/photo/vacuum-collage.webp', // portrait, about 0.62 : 1 (tools/prepare_photo.py crops and resizes)
+    src: 'assets/photo/vacuum-pack.webp', // the pack cut out of its white canvas, about 0.62 : 1
+    shade: 'assets/photo/vacuum-pack-shade.webp', // soft light and shade laid over it; '' for none
     // A plain description of what is visible. Reword it in your own voice, then remove "[Draft — check this]".
     alt: '[Draft — check this] A collage: a person in a red top and blue floral skirt lies under crinkled clear plastic, as if vacuum-packed, surrounded by sushi, fries, strawberries, a fruit-and-yogurt bowl and dumplings.',
   },

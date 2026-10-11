@@ -9,7 +9,8 @@ const noCloth = { count: 0, pos: new Float32Array(0), garmentOf: new Uint16Array
 const near = (a, b, eps = 0.5) => Math.abs(a - b) <= eps;
 
 test('nothing to clear over the open floor or the table', () => {
-  assert.equal(supportHeight(noCloth, colliders, 100, 150), 0);
+  // between the pack and the booklet, more than the hand's reach from either
+  assert.equal(supportHeight(noCloth, colliders, 165, 150), 0);
   assert.equal(supportHeight(noCloth, colliders, -500, -500), 0);
 });
 
@@ -25,6 +26,11 @@ test('over the booklet, its cover', () => {
   assert.ok(near(supportHeight(noCloth, colliders, x + width / 2, y + height / 2), 0.6 + thickness));
 });
 
+test('over the vacuum pack, its top', () => {
+  const { x, y, width, height, thickness } = CONTENTS.pack;
+  assert.ok(near(supportHeight(noCloth, colliders, x + width / 2, y + height / 2), thickness));
+});
+
 test('over an open flap, the flap surface at that spot', () => {
   const [hingeL, hingeR, tipR, tipL] = flapCorners('front');
   const mid = (p, q) => p.map((v, i) => (v + q[i]) / 2);
@@ -36,10 +42,10 @@ test('over an open flap, the flap surface at that spot', () => {
 });
 
 test('other cloth underneath counts; the held garment itself does not', () => {
-  const world = { count: 2, pos: new Float32Array([100, 150, 40, 103, 150, 90]), garmentOf: new Uint16Array([0, 1]), thickness: 7.5 };
-  assert.ok(near(supportHeight(world, colliders, 100, 150), 90 + 7.5));
-  assert.ok(near(supportHeight(world, colliders, 100, 150, { skip: 1 }), 40 + 7.5));
-  assert.equal(supportHeight(world, colliders, 160, 150), 0, 'too far away to matter');
+  const world = { count: 2, pos: new Float32Array([165, 150, 40, 168, 150, 90]), garmentOf: new Uint16Array([0, 1]), thickness: 7.5 };
+  assert.ok(near(supportHeight(world, colliders, 165, 150), 90 + 7.5));
+  assert.ok(near(supportHeight(world, colliders, 165, 150, { skip: 1 }), 40 + 7.5));
+  assert.equal(supportHeight(world, colliders, 165, 210), 0, 'too far away to matter');
 });
 
 test('the grip holds the particles of the hit garment close to the hit point', () => {

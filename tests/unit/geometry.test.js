@@ -52,14 +52,21 @@ const footprint = ({ x, y, width, height, rotate }) => {
   return { left: cx - hx, right: cx + hx, top: cy - hy, bottom: cy + hy };
 };
 
-test('photo, booklet and desiccant lie inside the walls without overlapping', () => {
+test('pack, booklet and desiccant lie inside the walls without overlapping', () => {
   const inner = { left: 2, right: BOX.width - 2, top: 2, bottom: BOX.depth - 2 };
-  const [photo, book, desiccant] = ['photo', 'book', 'desiccant'].map((k) => footprint(CONTENTS[k]));
-  [photo, book, desiccant].forEach((b) => {
+  const [pack, book, desiccant] = ['pack', 'book', 'desiccant'].map((k) => footprint(CONTENTS[k]));
+  [pack, book, desiccant].forEach((b) => {
     assert.ok(b.left >= inner.left && b.right <= inner.right, 'inside the side walls');
     assert.ok(b.top >= inner.top && b.bottom <= inner.bottom, 'inside the front and back walls');
   });
-  assert.ok(photo.right < book.left, 'the photo stays clear of the booklet');
-  assert.ok(CONTENTS.photo.x + CONTENTS.photo.width / 2 < BOX.width / 2, 'the photo is on the left');
+  assert.ok(pack.right < book.left, 'the pack stays clear of the booklet');
+  assert.ok(CONTENTS.pack.x + CONTENTS.pack.width / 2 < BOX.width / 2, 'the pack is on the left');
   assert.ok(desiccant.left > BOX.width * 0.75 && desiccant.top > BOX.depth * 0.6, 'the desiccant sits in the front-right corner');
+});
+
+test("the pack's seal edge curls up to rest on the left wall", () => {
+  const { x, edge, tilt, rotate } = CONTENTS.pack;
+  assert.equal(rotate, 0, 'square to the wall, so the whole edge touches it');
+  const reach = x - edge * Math.cos((tilt * Math.PI) / 180);
+  assert.ok(Math.abs(reach - 2) < 0.5, `the edge's top lies at x = ${reach}; the wall's inner face is at 2`);
 });

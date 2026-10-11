@@ -178,35 +178,42 @@ body[data-state="dark"] .floor-glow { opacity: 1; }
 /* ─── contents ─────────────────────────────────────────────────────────── */
 .contents { position: absolute; inset: 0; transform-style: preserve-3d; }
 
-.photo-card {
-  position: absolute; margin: 0;
-  transform: translateZ(1.6px) rotate(var(--rot));
-}
-.photo-frame {
-  position: absolute; inset: 0;
-  padding: 9px 9px 32px;
-  background: #fbf8f0;
-  border-radius: 2px 3px 2px 4px;
-  box-shadow: 2px 5px 9px rgba(30, 18, 8, .38), 0 0 0 .5px rgba(60, 40, 20, .2);
-}
-.photo-img {
-  display: block; width: 100%; height: 100%;
-  object-fit: cover;
-  background: #dfe5ea;
-  filter: sepia(.12) saturate(.95);
-}
-.photo-card.print .photo-frame {
-  padding: 4px;
-  border-radius: 1px;
-  background: #fdfdfb;
-  box-shadow: 2px 5px 9px rgba(30, 18, 8, .38), 0 0 0 .5px rgba(60, 40, 20, .18);
-}
-.photo-card.print .photo-img { filter: none; background: #fff; }
-.photo-card.print .photo-frame::before {
-  /* a soft gloss across the print */
-  content: ''; position: absolute; inset: 4px;
-  background: linear-gradient(118deg, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, .22) 46%, rgba(255, 255, 255, 0) 60%);
+/* The owner's vacuum pack: a flat body, its seal edge curling up the left wall. */
+.pack {
+  position: absolute;
+  transform-style: preserve-3d;
+  transform: rotate(var(--rot));
   pointer-events: none;
+}
+.pack-body {
+  position: absolute; inset: 0;
+  transform: translateZ(var(--thick));
+  /* Falls away from the light (+x, +y) like the cloth's shadows. The image's own
+     alpha shapes it: the clear film casts a faint shadow, the contents a firm one. */
+  filter: drop-shadow(2px 3px 2.5px rgba(30, 18, 8, .42)) brightness(calc(1 - (1 - var(--light, 1)) * .95));
+}
+.pack-img, .pack-shade {
+  position: absolute; top: 0; left: calc(-1 * var(--edge));
+  width: var(--full); height: 100%;
+  clip-path: inset(0 0 0 var(--edge)); /* the first `edge` pixels are the curled-up strip */
+}
+.pack-edge {
+  position: absolute; top: 0; left: calc(-1 * var(--edge));
+  width: var(--edge); height: 100%;
+  background: var(--pack-src, none) 0 0 / var(--full) 100% no-repeat;
+  transform-origin: 100% 50%;
+  transform: translateZ(var(--thick)) rotateY(var(--tilt));
+  /* turned toward the wall, the strip catches a little less light */
+  filter: brightness(calc(.9 * (1 - (1 - var(--light, 1)) * .95)));
+}
+.pack-joint {
+  /* soft contact shadow along the floor where the pack meets the wall */
+  position: absolute; top: 3px; bottom: 3px;
+  left: calc(-1 * var(--reach)); width: calc(var(--reach) + 12px);
+  transform: translateZ(.3px);
+  background: linear-gradient(90deg, rgba(30, 18, 8, .5), rgba(30, 18, 8, .18) 45%, rgba(30, 18, 8, 0));
+  filter: blur(1.5px);
+  opacity: var(--light, 1);
 }
 .desiccant {
   position: absolute;
@@ -214,18 +221,6 @@ body[data-state="dark"] .floor-glow { opacity: 1; }
   /* darkens with the rest of the interior until the light comes on */
   filter: drop-shadow(1px 2px 1.5px rgba(30, 18, 8, .38)) brightness(calc(1 - (1 - var(--light, 1)) * .95));
   pointer-events: none;
-}
-.photo-caption {
-  position: absolute; left: 6px; right: 6px; bottom: 5px;
-  font-size: 18px; line-height: 1; text-align: center;
-  color: var(--ink);
-}
-.washi {
-  position: absolute; top: -8px; left: 50%;
-  width: 58px; height: 17px;
-  transform: translateX(-50%) rotate(-5deg);
-  background: repeating-linear-gradient(45deg, rgba(194, 104, 74, .62) 0 6px, rgba(233, 182, 150, .62) 6px 12px);
-  clip-path: polygon(3% 0, 97% 6%, 100% 50%, 96% 100%, 2% 94%, 0 50%);
 }
 
 .book3d {

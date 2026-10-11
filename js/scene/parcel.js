@@ -59,17 +59,19 @@ function buildFlap(side) {
   return { flap, tapeSvg };
 }
 
-function buildPhoto(text) {
-  const { x, y, width, height, rotate } = CONTENTS.photo;
-  const card = h('figure', 'photo-card print');
-  card.style.cssText = `left:${x}px;top:${y}px;width:${width}px;height:${height}px;--rot:${rotate}deg`;
-  const frame = h('div', 'photo-frame inside');
-  const img = h('img', 'photo-img', { alt: '', draggable: 'false' });
-  const caption = h('figcaption', 'photo-caption hand');
-  caption.textContent = text.photoCaption || '';
-  frame.append(img, caption, h('span', 'washi', { 'aria-hidden': 'true' }));
-  card.append(frame);
-  return { el: card, img };
+/** The owner's vacuum pack: a flat body on the floor, its seal edge curling up the left wall. */
+function buildPack() {
+  const { x, y, width, height, thickness, rotate, edge, tilt } = CONTENTS.pack;
+  const reach = edge * Math.cos((tilt * Math.PI) / 180);
+  const pack = h('div', 'pack');
+  pack.style.cssText = `left:${x}px;top:${y}px;width:${width}px;height:${height}px;--rot:${rotate}deg;`
+    + `--edge:${edge}px;--full:${width + edge}px;--tilt:${tilt}deg;--thick:${thickness}px;--reach:${reach.toFixed(2)}px`;
+  const img = h('img', 'pack-img', { alt: '', draggable: 'false' });
+  const shade = h('img', 'pack-shade', { alt: '', draggable: 'false', 'aria-hidden': 'true' });
+  const body = h('div', 'pack-body');
+  body.append(img, shade);
+  pack.append(h('div', 'pack-joint', { 'aria-hidden': 'true' }), body, h('div', 'pack-edge', { 'aria-hidden': 'true' }));
+  return { el: pack, img, shade };
 }
 
 /** The silica-gel packet: a small static prop the clothes can rest against. */
@@ -124,11 +126,11 @@ export function buildParcel(container, { text }) {
   };
   Object.entries(vars).forEach(([k, v]) => parcel.style.setProperty(k, v));
 
-  const photo = buildPhoto(text);
+  const pack = buildPack();
   const book = buildBook(text);
   const desiccant = buildDesiccant();
   const contents = h('div', 'contents');
-  contents.append(photo.el, desiccant, book.el);
+  contents.append(pack.el, desiccant, book.el);
 
   const flaps = {};
   const tapeSvgs = {};
@@ -158,7 +160,7 @@ export function buildParcel(container, { text }) {
   );
   container.append(parcel);
 
-  return { parcel, flaps, tapeSvgs, tapeProbes, question, questionImg: glyphImg, book, photo, desiccant };
+  return { parcel, flaps, tapeSvgs, tapeProbes, question, questionImg: glyphImg, book, pack, desiccant };
 }
 
 /** Centre of an element's on-screen box (works for transformed 1px probes). */

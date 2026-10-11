@@ -4,6 +4,8 @@ import { buildMesh } from '../../js/cloth/mesh.js';
 import {
   createWorld, setPositions, step, grab, moveGrip, release, isSettled, centroid, sleepAll,
 } from '../../js/cloth/solver.js';
+import { boxColliders } from '../../js/scene/solids.js';
+import { CONTENTS } from '../../js/scene/geometry.js';
 
 const sheet = (cols = 6, rows = 6) => buildMesh({ id: 'sheet', size: [cols * 10, rows * 10], grid: { cols, rows, cells: '1'.repeat(cols * rows) } });
 const material = { stretchCompliance: 0, bendCompliance: 2e-5, friction: 0.5 };
@@ -288,4 +290,14 @@ test('off a steep side of a heap a garment still slips down', () => {
   run(w, 1.5);
   const slid = centroid(w, 1).reduce((sum, c, k) => sum + (c - before[k]) * down[k], 0);
   assert.ok(slid > 30, `slid ${slid.toFixed(1)} units down the heap`);
+});
+
+test('cloth dropped on the vacuum pack rests on top of it', () => {
+  const mesh = sheet(4, 4);
+  const w = world({ meshes: [mesh], colliders: boxColliders() });
+  const { x, y, width, height, thickness } = CONTENTS.pack;
+  const at = [x + width / 2 - 20, y + height / 2 - 20, 30];
+  setPositions(w, 0, Float32Array.from(mesh.rest, (v, i) => v + at[i % 3]));
+  run(w, 2);
+  zs(w).forEach((z) => assert.ok(z >= thickness + THICKNESS / 2 - 0.5, `z = ${z}`));
 });
