@@ -123,12 +123,51 @@ export function collideBox(pos, prev, i, box, radius, friction) {
   return true;
 }
 
+const SMEAR = 0.25; // share of its slide a garment in the hand loses at each cloth contact
+
+/**
+ * Friction between two touching particles, on how they slide past each
+ * other. Garments left alone obey the same Coulomb rule as `rub`, so one
+ * tossed onto the side of a heap grips instead of creeping. The garment in
+ * the hand (`smear`) only loses a share of its slide, as in Ten Minute
+ * Physics: its particles bump over the hollows between the particles below,
+ * where full friction would pin it while the hand pulls, and the pull would
+ * force it through the garment underneath. Particle a sits at 3·a, b at 3·b;
+ * (nx, ny, nz) points from a to b. `share0`, `share1` (summing to 1) split
+ * the correction; b counts as still when `bStill` (asleep or held).
+ */
+// Positional arguments: this runs for every touching pair every substep, so no option objects.
+function rubPair(pos, prev, a, b, nx, ny, nz, depth, kinetic, smear, share0, share1, bStill) { // eslint-disable-line max-params
+  const mx = (bStill ? 0 : pos[b] - prev[b]) - (pos[a] - prev[a]);
+  const my = (bStill ? 0 : pos[b + 1] - prev[b + 1]) - (pos[a + 1] - prev[a + 1]);
+  const mz = (bStill ? 0 : pos[b + 2] - prev[b + 2]) - (pos[a + 2] - prev[a + 2]);
+  const along = mx * nx + my * ny + mz * nz;
+  const tx = mx - nx * along;
+  const ty = my - ny * along;
+  const tz = mz - nz * along;
+  const slide = Math.sqrt(tx * tx + ty * ty + tz * tz);
+  if (slide === 0) return;
+  let stop = SMEAR;
+  if (!smear) {
+    const grip = kinetic * depth;
+    stop = slide <= STATIC_RATIO * grip ? 1 : grip / slide;
+  }
+  pos[a] += tx * stop * share0;
+  pos[a + 1] += ty * stop * share0;
+  pos[a + 2] += tz * stop * share0;
+  pos[b] -= tx * stop * share1;
+  pos[b + 1] -= ty * stop * share1;
+  pos[b + 2] -= tz * stop * share1;
+}
+
 /**
  * Resolve one particle pair. `w0`, `w1` are effective inverse masses (0 for
- * a held or resting particle). Returns whether they touched.
+ * a held or resting particle); `inHand` when either belongs to the garment
+ * being carried (see rubPair). Friction is the mean of the two garments'
+ * own. Returns whether they touched.
  */
-export function collidePair(world, id0, id1, w0, w1, friction) {
-  const { pos, prev, rest, garmentOf, thickness } = world;
+export function collidePair(world, id0, id1, w0, w1, inHand) {
+  const { pos, prev, rest, garmentOf, thickness, friction } = world;
   const a = 3 * id0;
   const b = 3 * id1;
   let dx = pos[b] - pos[a];
@@ -148,6 +187,9 @@ export function collidePair(world, id0, id1, w0, w1, friction) {
   }
 
   const dist = Math.sqrt(dist2);
+  const nx = dx / dist;
+  const ny = dy / dist;
+  const nz = dz / dist;
   const w = w0 + w1;
   const correction = (minDist - dist) / dist / w;
   dx *= correction;
@@ -160,14 +202,7 @@ export function collidePair(world, id0, id1, w0, w1, friction) {
   pos[b + 1] += dy * w1;
   pos[b + 2] += dz * w1;
 
-  // friction: nudge both towards a shared motion (a resting partner does not move)
-  const share = w1 / w; // weight of id0's motion: the heavier (lower w) particle counts for more
-  for (let c = 0; c < 3; c += 1) {
-    const move0 = pos[a + c] - prev[a + c];
-    const move1 = w1 > 0 ? pos[b + c] - prev[b + c] : 0;
-    const shared = move0 * share + move1 * (1 - share);
-    if (w0 > 0) pos[a + c] += (shared - move0) * friction;
-    if (w1 > 0) pos[b + c] += (shared - move1) * friction;
-  }
+  const kinetic = (friction[garmentOf[id0]] + friction[garmentOf[id1]]) / 2;
+  rubPair(pos, prev, a, b, nx, ny, nz, minDist - dist, kinetic, inHand, w0 / w, w1 / w, w1 === 0);
   return true;
 }

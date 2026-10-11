@@ -26,7 +26,6 @@ export const DEFAULTS = Object.freeze({
   sleepAfter: 0.4, // a garment sleeps when, over this many seconds,
   sleepDrift: 1.5, // nearly all of its particles moved less than this...
   restlessShare: 0.05, // ...where "nearly all" allows this share of stray, buzzing particles
-  contactFriction: 0.25, // cloth on cloth
   contactDamping: 0.98, // share of speed a touching particle keeps per substep: a little calm for crumpled heaps
 });
 
@@ -301,7 +300,8 @@ function disturbs(world, a, b, touched, drift2) {
  * frame; returns the new count.
  */
 function solveContacts(world, ranges, count) {
-  const { hash, invMass, garmentOf, awake, touching, settings, disturber, disturbed } = world;
+  const { hash, invMass, garmentOf, awake, touching, settings, disturber, disturbed, grip } = world;
+  const held = grip ? grip.garment : -1;
   const { firstAdjId, adjIds } = hash;
   const drift2 = settings.sleepDrift * settings.sleepDrift;
   let noted = count;
@@ -313,7 +313,7 @@ function solveContacts(world, ranges, count) {
         const sleeping = awake[garmentOf[id1]] === 0;
         const w1 = sleeping ? 0 : invMass[id1];
         if (w0 + w1 === 0) continue;
-        const touched = collidePair(world, id0, id1, w0, w1, settings.contactFriction);
+        const touched = collidePair(world, id0, id1, w0, w1, garmentOf[id0] === held || garmentOf[id1] === held);
         if (touched) {
           touching[id0] = 1;
           touching[id1] = 1;

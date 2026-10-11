@@ -171,11 +171,16 @@ test('a garment dragged across the top of a sleeping one leaves it asleep', () =
   const held = w.offsets[1] + 6; // the top sheet's right-hand front corner
   const start = [0, 1, 2].map((c) => w.pos[3 * held + c]);
   grab(w, 1, [held], start);
+  const top = Array.from({ length: w.counts[1] }, (_, k) => w.offsets[1] + k);
+  const over = (i) => [0, 1].every((c) => w.pos[3 * i + c] > 5 && w.pos[3 * i + c] < 95); // above the lower sheet
+  let lowest = Infinity;
   for (let t = 1; t <= 30; t += 1) {
     moveGrip(w, [start[0] + 4 * t, start[1], start[2] + Math.min(20, t)]); // lift a little, pull across
     step(w, 1 / 60);
+    top.filter(over).forEach((i) => { lowest = Math.min(lowest, w.pos[3 * i + 2]); });
   }
   assert.equal(w.awake[0], 0);
+  assert.ok(lowest > THICKNESS / 2 + 1.5, `the dragged sheet stays on top (dipped to z ${lowest.toFixed(2)})`);
 });
 
 test('one stray fast particle does not wake a sleeping garment', () => {
@@ -239,4 +244,48 @@ test('on a steep 45° slope cloth still slides off', () => {
   run(w, 1.5);
   const slid = centroid(w, 0).reduce((sum, c, k) => sum + (c - before[k]) * down[k], 0);
   assert.ok(slid > 30, `slid ${slid.toFixed(1)} units down the slope`);
+});
+
+/**
+ * A small sheet lying on a big one that is asleep on a slope of `deg`, like
+ * a garment tossed onto the side of a heap. The small one is turned 30°, as
+ * tossed garments land: two particle grids lined up exactly would lock into
+ * each other's hollows like egg boxes. Returns the world and the down-slope axis.
+ */
+function onClothSlope(deg) {
+  const a = (deg * Math.PI) / 180;
+  const along = [Math.cos(a), 0, Math.sin(a)];
+  const normal = [-Math.sin(a), 0, Math.cos(a)];
+  const w = world({ meshes: [sheet(16, 16), sheet(6, 6)] });
+  const centre = [80, 80, 120];
+  [[0, 80, 0, 0], [1, 30, THICKNESS + 0.3, Math.PI / 6]].forEach(([g, half, lift, turn]) => {
+    const p = shifted(w, g, [0, 0, 0]);
+    for (let i = 0; i < p.length; i += 3) {
+      const x = p[i] - half;
+      const y = p[i + 1] - half;
+      const u = x * Math.cos(turn) - y * Math.sin(turn);
+      const v = x * Math.sin(turn) + y * Math.cos(turn);
+      [0, 1, 2].forEach((k) => { p[i + k] = centre[k] + along[k] * u + (k === 1 ? v : 0) + normal[k] * lift; });
+    }
+    setPositions(w, g, p);
+  });
+  w.awake[0] = 0; // the heap below holds still, a solid obstacle
+  return { w, down: along.map((c) => -c) };
+}
+
+test('a garment tossed onto the gentle side of a heap grips and comes to rest', () => {
+  const { w, down } = onClothSlope(20);
+  const before = centroid(w, 1);
+  run(w, 3);
+  const slid = centroid(w, 1).reduce((sum, c, k) => sum + (c - before[k]) * down[k], 0);
+  assert.ok(slid < 3, `slid ${slid.toFixed(1)} units down the heap`);
+  assert.ok(isSettled(w), 'asleep, not creeping');
+});
+
+test('off a steep side of a heap a garment still slips down', () => {
+  const { w, down } = onClothSlope(50);
+  const before = centroid(w, 1);
+  run(w, 1.5);
+  const slid = centroid(w, 1).reduce((sum, c, k) => sum + (c - before[k]) * down[k], 0);
+  assert.ok(slid > 30, `slid ${slid.toFixed(1)} units down the heap`);
 });
