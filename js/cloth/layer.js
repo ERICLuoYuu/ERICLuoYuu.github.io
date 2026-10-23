@@ -41,7 +41,10 @@ const CARRY_TIME = [0.8, 1.6]; // ...taking between these many seconds
 const CLEAR_SHIFT = 700; // clearAside(): far enough right to be off the box
 const CONTEXT = { alpha: true, premultipliedAlpha: true, antialias: true, depth: true, stencil: false };
 const BODY_PX = 4; // pixels a unit in the figurine's and the food's pictures
-const BOOK = fromRect(CONTENTS.book); // the booklet, as a body, for overBook
+const BOOK = fromRect({ ...CONTENTS.book, id: 'booklet' }, 0.6); // the booklet as a body: .book3d sits at translateZ(.6px)
+const COVER_TOP = BOOK.position[2] + BOOK.height;
+/** Does a body lie over the booklet: over its cover, and no lower than the cover? */
+const overBook = (body) => overlapXY(body, BOOK) && body.position[2] >= COVER_TOP - 1;
 
 const DISABLED = Object.freeze({
   enabled: false,
@@ -429,6 +432,11 @@ function createLayer({
     }
   }
 
+  /** Share of the booklet's cover under cloth, or under the figurine or food lying on it, 0…1. */
+  function coverage() {
+    return bookCoverage(world, CONTENTS.book, { solids: rigid ? rigid.colliders() : [] });
+  }
+
   /** On-screen box (CSS pixels) around parcel points. */
   function outline(points) {
     const frame = camera.frame();
@@ -556,8 +564,7 @@ function createLayer({
       if (index < 0) return null;
       return projectPoint(camera.frame(), viewport(), surfacePoint(rigid.bodies[index], solids.samplers[index].relief, uv));
     },
-    /** Share of the booklet's cover under cloth, 0…1. */
-    coverage: () => bookCoverage(world, CONTENTS.book),
+    coverage,
     /** Call fn whenever everything has come to rest; returns an unsubscribe function. */
     onSettle(fn) {
       settleListeners.add(fn);
@@ -576,9 +583,9 @@ function createLayer({
       grip: world.grip ? [...world.grip.to] : null,
       awake: world.awake.reduce((sum, a) => sum + a, 0),
       substeps,
-      coverage: bookCoverage(world, CONTENTS.book),
+      coverage: coverage(),
       garments: data.garments.map(({ id }, g) => ({ id, awake: world.awake[g] === 1, centre: centroid(world, g).map(Math.round) })),
-      rigid: rigid ? rigid.status().map((s, i) => ({ ...s, overBook: overlapXY(rigid.bodies[i], BOOK) })) : [],
+      rigid: rigid ? rigid.status().map((s, i) => ({ ...s, overBook: overBook(rigid.bodies[i]) })) : [],
       heldBody: hand.garment !== null ? data.garments[hand.garment].id : (rigid?.heldId ?? null),
     }),
     /** Screen position of a parcel point (CSS pixels). */

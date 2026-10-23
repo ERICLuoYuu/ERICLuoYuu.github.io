@@ -1,9 +1,12 @@
 /**
- * Keyboard and screen-reader access to the clothes: one button per garment,
- * laid over the garment on screen so its focus ring outlines it. Tab goes
- * through the pile from the top down; Enter or Space carries the garment
- * out of the box (clothes.moveAside). Mouse and touch never reach these
- * buttons — they pick the cloth itself.
+ * Keyboard and screen-reader access to the clothes and the bodies: one
+ * button per garment, and one per rigid body (the figurine and the food),
+ * each laid over its body on screen so its focus ring outlines it. A garment
+ * has its button while it is in the box, a rigid body only while it lies on
+ * the booklet. Tab goes through the pile from the top down; Enter or Space
+ * carries a garment out of the box (clothes.moveAside) and a rigid body back
+ * to where it started (clothes.moveBodyHome). Mouse and touch never reach
+ * these buttons — they pick the bodies themselves.
  */
 
 import { BOX } from '../scene/geometry.js';
@@ -14,18 +17,22 @@ const inBox = ([x, y]) => x > 0 && x < BOX.width && y > 0 && y < BOX.depth;
 /**
  * @param {{host: HTMLElement, clothes: object, text: object, announce: (message: string) => void,
  *          afterLast?: () => HTMLElement | null}} options
- *   `afterLast` gives the element focus moves on to once no garment is left in the box.
+ *   `afterLast` gives the element focus moves on to once no button is left.
  * @returns {{enable(): void, disable(): void, layout(): void, first(): HTMLElement | null}}
  */
 export function createClothesKeys({ host, clothes, text, announce, afterLast = () => null }) {
-  const label = (g) => clothes.garments[g].label;
-  const buttons = clothes.garments.map((_, g) => {
+  // in the order of clothes.bodies: the garments, then the rigid bodies
+  const items = [
+    ...clothes.garments.map(({ id, label }, index) => ({ kind: 'garment', index, id, label })),
+    ...(clothes.solids ?? []).map(({ id, label }, index) => ({ kind: 'rigid', index, id, label })),
+  ];
+  const buttons = items.map((item, n) => {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'clothes-key';
     button.hidden = true;
-    button.setAttribute('aria-label', text.moveAside.replace('{garment}', label(g)));
-    button.addEventListener('click', () => move(g));
+    button.setAttribute('aria-label', text.moveAside.replace('{garment}', item.label));
+    button.addEventListener('click', () => move(n));
     return button;
   });
   let enabled = false;
@@ -34,7 +41,7 @@ export function createClothesKeys({ host, clothes, text, announce, afterLast = (
 
   const shown = () => [...host.children].filter((b) => !b.hidden); // in tab order
 
-  /** Hide a button; if it has focus, focus moves on to the next garment, or past the last one. */
+  /** Hide a button; if it has focus, focus moves on to the next one, or past the last one. */
   function hide(button) {
     if (document.activeElement === button) {
       const list = shown();
@@ -44,22 +51,35 @@ export function createClothesKeys({ host, clothes, text, announce, afterLast = (
     button.hidden = true;
   }
 
+  /** Put the buttons in tab order from the top of the pile down, keeping focus where it is. */
+  function order(height) {
+    const sorted = [...buttons.keys()].sort((a, b) => height[b] - height[a]).map((n) => buttons[n]);
+    if (sorted.every((button, i) => host.children[i] === button)) return;
+    const focused = document.activeElement;
+    host.replaceChildren(...sorted);
+    if (sorted.includes(focused) && document.activeElement !== focused) focused.focus({ preventScroll: true });
+  }
+
   /**
-   * Lay each button over its garment's outline on screen. Only garments in
-   * the box have one: a garment dragged out with the mouse loses its button,
-   * and one dragged back in gets it again.
+   * Lay each button over its body's outline on screen. Only garments in the
+   * box have one: a garment dragged out with the mouse loses its button, and
+   * one dragged back in gets it again. A rigid body has one only while it
+   * lies on the booklet.
    */
   function layout() {
     if (!enabled) return;
-    const centre = Object.fromEntries(clothes.status().garments.map((g) => [g.id, g.centre]));
-    buttons.forEach((button, g) => {
-      const inside = inBox(centre[clothes.garments[g].id]);
-      if (!inside) {
+    const status = clothes.status();
+    const garments = Object.fromEntries(status.garments.map((g) => [g.id, g]));
+    const rigid = Object.fromEntries((status.rigid ?? []).map((b) => [b.id, b]));
+    const of = (item) => (item.kind === 'garment' ? garments[item.id] : rigid[item.id]);
+    const showing = (item) => (item.kind === 'garment' ? inBox(of(item).centre) : Boolean(of(item)?.overBook));
+    buttons.forEach((button, n) => {
+      if (!showing(items[n])) {
         if (!button.hidden) hide(button);
         return;
       }
       button.hidden = false;
-      const box = clothes.screenBox(g);
+      const box = clothes.screenBox(n);
       if (!box) return;
       Object.assign(button.style, {
         left: `${box.left.toFixed(1)}px`,
@@ -68,23 +88,25 @@ export function createClothesKeys({ host, clothes, text, announce, afterLast = (
         height: `${box.height.toFixed(1)}px`,
       });
     });
+    order(items.map((item) => of(item)?.centre[2] ?? -Infinity));
   }
 
-  async function move(g) {
-    if (!enabled || busy || buttons[g].hidden) return;
+  async function move(n) {
+    const { kind, index, label } = items[n];
+    if (!enabled || busy || buttons[n].hidden) return;
     busy = true;
     try {
-      await clothes.moveAside(g);
+      await (kind === 'garment' ? clothes.moveAside(index) : clothes.moveBodyHome(index));
     } catch (err) {
-      console.warn(`[parcel] The ${label(g)} could not be moved aside:`, err);
-      announce(text.moveFailed.replace('{garment}', label(g)));
+      console.warn(`[parcel] The ${label} could not be moved aside:`, err);
+      announce(text.moveFailed.replace('{garment}', label));
       return;
     } finally {
       busy = false;
     }
     if (!enabled) return; // restarted meanwhile
-    hide(buttons[g]);
-    announce(text.movedAside.replace('{garment}', label(g)));
+    hide(buttons[n]);
+    announce(text.movedAside.replace('{garment}', label));
   }
 
   function onResize() {
@@ -94,13 +116,9 @@ export function createClothesKeys({ host, clothes, text, announce, afterLast = (
   addEventListener('resize', onResize);
 
   return {
-    /** Show a button per garment in the box, in pile order from the top down. */
+    /** Show the buttons of the garments in the box and the bodies on the booklet, from the top of the pile down. */
     enable() {
       enabled = true;
-      const height = Object.fromEntries(clothes.status().garments.map(({ id, centre }) => [id, centre[2]]));
-      const order = Array.from(clothes.garments.keys())
-        .sort((a, b) => height[clothes.garments[b].id] - height[clothes.garments[a].id]);
-      host.replaceChildren(...order.map((g) => buttons[g]));
       layout();
     },
     disable() {
@@ -108,7 +126,7 @@ export function createClothesKeys({ host, clothes, text, announce, afterLast = (
       buttons.forEach((button) => { button.hidden = true; });
     },
     layout,
-    /** The first garment button still showing, or null. */
+    /** The first button still showing, or null. */
     first: () => shown()[0] ?? null,
   };
 }

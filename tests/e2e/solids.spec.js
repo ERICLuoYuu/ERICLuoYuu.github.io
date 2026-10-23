@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { openSite, waitForState } from './helpers.js';
-import { waitForSettled, pointOn, pixelAt } from './clothes-helpers.js';
+import {
+  clothesOf, waitForSettled, pointOn, dragMouse, pixelAt,
+} from './clothes-helpers.js';
 
 const IDS = ['figurine', 'sushi', 'fries', 'strawberries', 'bowl', 'dumplings'];
 
@@ -30,4 +32,36 @@ test('without WebGL2 the figurine and the food lie still as pictures, fully visi
     expect(await img.evaluate((el) => getComputedStyle(el.closest('.solid')).opacity)).toBe('1');
     expect(await img.getAttribute('alt')).not.toBe('');
   }
+});
+
+test('the figurine laid over the booklet keeps it locked; its keyboard button takes it home', async ({ page }) => {
+  await openSite(page, '?jump=clear');
+  await waitForState(page, 'overhead');
+  await waitForSettled(page);
+  expect((await clothesOf(page)).reachable).toBe(true);
+  const figurine = await pointOn(page, 'figurine');
+  const book = await page.locator('.book-top').boundingBox();
+  await dragMouse(page, figurine, { x: book.x + book.width, y: figurine.y });
+  await waitForSettled(page);
+  expect((await clothesOf(page)).reachable, 'the figurine covers the booklet').toBe(false);
+  const key = page.getByRole('button', { name: 'Move the figurine aside' });
+  await key.focus();
+  await page.keyboard.press('Enter');
+  await waitForSettled(page);
+  const status = await clothesOf(page);
+  const [x, y] = status.rigid.find((b) => b.id === 'figurine').centre;
+  expect(Math.abs(x - 68.5)).toBeLessThanOrEqual(1);
+  expect(Math.abs(y - 150)).toBeLessThanOrEqual(1);
+  expect(status.reachable).toBe(true);
+});
+
+test('a food item over the booklet gets its own keyboard button', async ({ page }) => {
+  await openSite(page, '?jump=clear');
+  await waitForState(page, 'overhead');
+  await waitForSettled(page);
+  await expect(page.getByRole('button', { name: 'Move the fruit bowl aside' })).toBeHidden();
+  const book = await page.locator('.book-top').boundingBox();
+  await dragMouse(page, await pointOn(page, 'bowl'), { x: book.x + book.width / 2, y: book.y + book.height / 2 });
+  await waitForSettled(page);
+  await expect(page.getByRole('button', { name: 'Move the fruit bowl aside' })).toHaveCount(1);
 });
