@@ -1,0 +1,92 @@
+{
+ "pxPerUnit": 4,
+ "items": [
+  {
+   "id": "sushi",
+   "label": "sushi",
+   "size": [
+    52,
+    68
+   ],
+   "height": 12,
+   "texture": "assets/food/sushi.webp",
+   "relief": "assets/food/sushi-relief.webp",
+   "cleaned": [
+    [
+     78,
+     148,
+     87,
+     156
+    ],
+    [
+     83,
+     157,
+     92,
+     169
+    ]
+   ]
+  },
+  {
+   "id": "fries",
+   "label": "fries",
+   "size": [
+    32,
+    40
+   ],
+   "height": 22,
+   "texture": "assets/food/fries.webp",
+   "relief": "assets/food/fries-relief.webp",
+   "cleaned": [
+    [
+     38,
+     80,
+     82,
+     120
+    ]
+   ]
+  },
+  {
+   "id": "strawberries",
+   "label": "strawberries",
+   "size": [
+    44,
+    44
+   ],
+   "height": 16,
+   "texture": "assets/food/strawberries.webp",
+   "relief": "assets/food/strawberries-relief.webp",
+   "cleaned": [
+    [
+     53,
+     56,
+     117,
+     124
+    ]
+   ]
+  },
+  {
+   "id": "bowl",
+   "label": "fruit bowl",
+   "size": [
+    42,
+    42
+   ],
+   "height": 18,
+   "texture": "assets/food/bowl.webp",
+   "relief": "assets/food/bowl-relief.webp",
+   "cleaned": []
+  },
+  {
+   "id": "dumplings",
+   "label": "dumplings",
+   "size": [
+    40,
+    40
+   ],
+   "height": 10,
+   "texture": "assets/food/dumplings.webp",
+   "relief": "assets/food/dumplings-relief.webp",
+   "cleaned": []
+  }
+ ]
+}
