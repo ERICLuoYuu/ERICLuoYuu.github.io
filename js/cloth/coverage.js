@@ -1,8 +1,8 @@
 /**
- * Is the booklet still buried under the clothes? Pure — no DOM.
+ * Is the booklet still buried under the clothes (or the food)? Pure — no DOM.
  */
 
-/** Points spread evenly over the booklet's top (its CONTENTS entry, rotated like .book3d). */
+/** Points spread evenly over a rectangle on the floor (a CONTENTS entry, rotated like .book3d). */
 function samplePoints({ x, y, width, height, rotate }, cols, rows) {
   const a = (rotate * Math.PI) / 180;
   const cx = x + width / 2;
@@ -18,19 +18,27 @@ function samplePoints({ x, y, width, height, rotate }, cols, rows) {
   return points;
 }
 
-/**
- * Share (0…1) of the booklet's top with cloth over it: a sample point counts
- * as covered when some core cloth particle above the cover lies within `radius`
- * of it, seen from above.
- */
-export function bookCoverage(world, book, { cols = 8, rows = 11, radius = 9 } = {}) {
-  const top = 0.6 + book.thickness + 0.5; // .book3d sits at translateZ(.6px)
-  const points = samplePoints(book, cols, rows);
-  const reach = Math.hypot(book.width, book.height) / 2 + radius;
-  const cx = book.x + book.width / 2;
-  const cy = book.y + book.height / 2;
+/** Does an upright solid box (a rigid body's collider) stand over floor point (x, y), higher than `top`? */
+function solidCovers({ center, axes, half }, [x, y], top) {
+  if (center[2] + half[2] <= top) return false;
+  const [dx, dy] = [x - center[0], y - center[1]];
+  return [0, 1].every((k) => Math.abs(dx * axes[k][0] + dy * axes[k][1]) <= half[k]);
+}
 
-  // Only cloth above the cover and near the booklet can cover it.
+/**
+ * Share (0…1) of a rectangle on the floor (CONTENTS style: `x`, `y` its
+ * unturned top-left corner) that something lies over, seen from above: a
+ * sample point counts as covered when some core cloth particle higher than
+ * `top` lies within `radius` of it, or when one of `solids` (rigid bodies'
+ * colliders) stands over it and reaches higher than `top`.
+ */
+export function coverageOf(world, area, top, { cols = 8, rows = 11, radius = 9, solids = [] } = {}) {
+  const points = samplePoints(area, cols, rows);
+  const reach = Math.hypot(area.width, area.height) / 2 + radius;
+  const cx = area.x + area.width / 2;
+  const cy = area.y + area.height / 2;
+
+  // Only cloth above the top and near the rectangle can cover it.
   const nearby = [];
   for (let i = 0; i < world.count; i += 1) {
     if (world.core && !world.core[i]) continue; // a transparent margin hides nothing
@@ -39,8 +47,14 @@ export function bookCoverage(world, book, { cols = 8, rows = 11, radius = 9 } = 
     if (world.pos[3 * i + 2] > top && Math.hypot(px - cx, py - cy) < reach) nearby.push([px, py]);
   }
   const r2 = radius * radius;
-  const covered = points.filter(([sx, sy]) => nearby.some(([px, py]) => (px - sx) ** 2 + (py - sy) ** 2 <= r2));
+  const covered = points.filter((p) => solids.some((box) => solidCovers(box, p, top))
+    || nearby.some(([px, py]) => (px - p[0]) ** 2 + (py - p[1]) ** 2 <= r2));
   return covered.length / points.length;
+}
+
+/** Share (0…1) of the booklet's top hidden under cloth, or under `solids` lying on it. */
+export function bookCoverage(world, book, options) {
+  return coverageOf(world, book, 0.6 + book.thickness + 0.5, options); // .book3d sits at translateZ(.6px)
 }
 
 /**

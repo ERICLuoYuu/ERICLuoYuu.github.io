@@ -6,7 +6,7 @@ import { supportUnder } from '../../js/cloth/grip.js';
 import { boxColliders, flapCorners } from '../../js/scene/solids.js';
 import { BOOKS, FOOD, baseOf } from '../../js/scene/geometry.js';
 import { createBody, withPosition, bodyCollider, footprintPoints } from '../../js/rigid/body.js';
-import { supportOf, settle, isResting } from '../../js/rigid/rest.js';
+import { supportOf, settle, isResting, clothOn } from '../../js/rigid/rest.js';
 
 const THICKNESS = 4.5;
 /** A 60 × 60 sheet asleep with its middle at (x, y) on the floor (far away by default). */
@@ -81,4 +81,12 @@ test('cloth lying on top of a body does not hold it up', () => {
   const world = sheetWorld(170, 56);
   setPositions(world, 0, world.pos.map((v, i) => (i % 3 === 2 ? v + sushi.height : v)));
   assert.equal(supportOf(sushi, [170, 56], { world, colliders: [] }), 0);
+});
+
+test('cloth lying on a body is found; cloth beside it is not', () => {
+  const sushi = withPosition(createBody(FOOD[0]), [300, 200, 0]);
+  const on = sheetWorld(300, 200);
+  setPositions(on, 0, on.pos.map((v, i) => (i % 3 === 2 ? v + sushi.height : v)));
+  assert.deepEqual(clothOn(on, sushi), [0]);
+  assert.deepEqual(clothOn(sheetWorld(500, 200), sushi), []);
 });

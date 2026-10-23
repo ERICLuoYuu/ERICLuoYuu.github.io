@@ -5,18 +5,21 @@
  *   node tools/build-pile.mjs        (npm run clothes runs it after the art)
  *
  * Each garment is laid loosely with at most one fold, turned and dropped
- * onto the booklet in the upper right with the same solver the site uses.
+ * onto the booklet in the upper right with the same solver the site uses,
+ * among the box, the books and the figurine and the food at their starting
+ * places (rigid bodies the cloth collides with).
  * The result goes to assets/clothes/pile.json. If the pile does not hide the
- * booklet or shows fewer than six signature features, the next random seed
- * is tried.
+ * booklet, covers any of the figurine or the food, or shows fewer than six
+ * signature features, the next random seed is tried.
  */
 
 import { readFile, writeFile } from 'node:fs/promises';
 import { buildMesh, particleNear } from '../js/cloth/mesh.js';
 import { createWorld, setPositions, sleep, step, centroid } from '../js/cloth/solver.js';
-import { bookCoverage, isExposed } from '../js/cloth/coverage.js';
+import { bookCoverage, coverageOf, isExposed } from '../js/cloth/coverage.js';
 import { boxColliders } from '../js/scene/solids.js';
-import { BOX, CONTENTS } from '../js/scene/geometry.js';
+import { BOX, CONTENTS, FIGURINE, FOOD } from '../js/scene/geometry.js';
+import { createBody, areaOf, bodyCollider } from '../js/rigid/body.js';
 
 const ROOT = new URL('../', import.meta.url);
 const THICKNESS = 4.5; // cells of at most 6: covers the 4.2-unit gap in the middle of a cell
@@ -24,7 +27,8 @@ const BOUNDS = { min: [-900, -900, 0], max: [1300, 1300, 900] };
 // Where particle centres may be laid: the walls are 2 thick, plus a particle radius and a little air.
 const INSIDE = { min: [8, 8], max: [BOX.width - 8, BOX.depth - 8] };
 const PARKED_X = -3000; // garments wait far away until it is their turn
-const TARGETS = { book: 0.88, signatures: 6 };
+const TARGETS = { book: 0.88, bodies: 0.05, signatures: 6 };
+const BODIES = [FIGURINE, ...FOOD].map(createBody); // where the figurine and the food lie at the start
 const JITTER = { turn: 16, shift: 6 }; // degrees and units of random variation per seed
 const DROP_GAP = 12; // each garment is dropped this far above the pile so far
 
@@ -142,7 +146,7 @@ function buildPile(garments, seed) {
   const meshes = garments.map(buildMesh);
   const world = createWorld({
     garments: meshes.map((mesh, i) => ({ mesh, material: garments[i].material })),
-    colliders: boxColliders(),
+    colliders: [...boxColliders(), ...BODIES.map(bodyCollider)],
     bounds: BOUNDS,
     thickness: THICKNESS,
   });
@@ -177,11 +181,12 @@ async function main() {
     const started = Date.now();
     const { world, meshes } = buildPile(data.garments, seed);
     const book = bookCoverage(world, CONTENTS.book);
+    const bodies = Math.max(...BODIES.map((b) => coverageOf(world, areaOf(b), b.height)));
     const seen = visibleSignatures(world, data.garments, meshes);
     const seconds = ((Date.now() - started) / 1000).toFixed(1);
-    console.log(`seed ${seed}: booklet ${(book * 100).toFixed(0)} % hidden, `
+    console.log(`seed ${seed}: booklet ${(book * 100).toFixed(0)} % hidden, figurine and food at most ${(bodies * 100).toFixed(0)} % covered, `
       + `${seen.length} signatures in view (${seen.join(', ')}) (${seconds} s)`);
-    if (book >= TARGETS.book && seen.length >= TARGETS.signatures) {
+    if (book >= TARGETS.book && bodies <= TARGETS.bodies && seen.length >= TARGETS.signatures) {
       const garments = data.garments.map(({ id }, g) => ({
         id,
         positions: Array.from(world.pos.subarray(3 * world.offsets[g], 3 * (world.offsets[g] + world.counts[g])), (v) => Math.round(v * 10) / 10),
@@ -193,7 +198,7 @@ async function main() {
       return;
     }
   }
-  throw new Error('No seed produced a pile that hides the booklet and shows the garments; adjust PLAN.');
+  throw new Error('No seed produced a pile that hides the booklet, spares the figurine and the food and shows the garments; adjust PLAN.');
 }
 
 main().catch((err) => {

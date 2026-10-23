@@ -43,11 +43,12 @@ test('garments.json lists the eight garments with textures, grids and materials'
   }));
 });
 
-test('pile.json is a settled pile that hides the booklet', async () => {
+test('pile.json is a settled pile that hides the booklet and leaves the figurine and food bare', async () => {
   const { createWorld, setPositions } = await import('../../js/cloth/solver.js');
-  const { bookCoverage, isExposed } = await import('../../js/cloth/coverage.js');
+  const { bookCoverage, coverageOf, isExposed } = await import('../../js/cloth/coverage.js');
   const { particleNear } = await import('../../js/cloth/mesh.js');
-  const { CONTENTS } = await import('../../js/scene/geometry.js');
+  const { CONTENTS, FIGURINE, FOOD } = await import('../../js/scene/geometry.js');
+  const { createBody, areaOf, bodyCollider } = await import('../../js/rigid/body.js');
   const data = await readJson('assets/clothes/garments.json');
   const pile = await readJson('assets/clothes/pile.json');
   assert.equal(pile.version, 1);
@@ -74,6 +75,15 @@ test('pile.json is a settled pile that hides the booklet', async () => {
     world.offsets[g] + particleNear(meshes[g], [signature[0] * size[0], signature[1] * size[1]])));
   assert.ok(seen.length >= 6, `signatures in view: ${seen.map((g) => g.id).join(', ')}`);
   assert.ok(bookCoverage(world, CONTENTS.book) >= 0.85, 'the booklet is hidden');
+  const bodies = [FIGURINE, ...FOOD].map(createBody);
+  bodies.forEach((b) => assert.ok(coverageOf(world, areaOf(b), b.height) <= 0.08, `${b.id} stays uncovered`));
+  bodies.map(bodyCollider).forEach((c) => {
+    for (let i = 0; i < world.count; i += 1) {
+      const p = world.pos.subarray(3 * i, 3 * i + 3);
+      const inside = c.axes.every((a, k) => Math.abs((p[0] - c.center[0]) * a[0] + (p[1] - c.center[1]) * a[1] + (p[2] - c.center[2]) * a[2]) < c.half[k] - 0.5);
+      assert.ok(!inside, `particle ${i} lies inside ${c.name}`);
+    }
+  });
 });
 
 test('the clothes data hold garments only: the pack is gone', async () => {

@@ -186,7 +186,7 @@ function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
   let cost = 0; // smoothed milliseconds per step
 
   const viewport = () => ({ width: canvas.clientWidth || innerWidth, height: canvas.clientHeight || innerHeight });
-  const hand = createHand({ world, colliders, ray: (sx, sy) => screenRay(camera.frame(), viewport(), sx, sy) });
+  const hand = createHand({ world, ray: (sx, sy) => screenRay(camera.frame(), viewport(), sx, sy) });
   const active = () => world.grip !== null || !isSettled(world);
 
   function schedule() {
@@ -295,7 +295,7 @@ function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
     const to = asideTarget(world, g);
     if (reducedMotion()) {
       hand.drop();
-      dropAt(world, colliders, g, to);
+      dropAt(world, g, to);
       schedule();
       return Promise.resolve();
     }

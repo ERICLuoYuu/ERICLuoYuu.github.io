@@ -58,31 +58,33 @@ export function asideTarget(world, g) {
 
 /**
  * Put garment g down at (x, y) straight away (a move without motion): its
- * shape kept, its lowest point just above what lies there. Everything wakes,
- * so cloth that lay on it settles into the gap.
+ * shape kept, its lowest point just above what lies there (the world's
+ * colliders and other cloth). Everything wakes, so cloth that lay on it
+ * settles into the gap.
  */
-export function dropAt(world, colliders, g, [x, y]) {
+export function dropAt(world, g, [x, y]) {
   const [cx, cy] = centroid(world, g);
   const from = 3 * world.offsets[g];
   const to = from + 3 * world.counts[g];
   let low = Infinity;
   for (let v = from + 2; v < to; v += 3) low = Math.min(low, world.pos[v]);
-  const floor = supportHeight(world, colliders, x, y, { skip: g }) + world.thickness;
+  const floor = supportHeight(world, world.colliders, x, y, { skip: g }) + world.thickness;
   const shift = [x - cx, y - cy, floor - low];
   setPositions(world, g, Float32Array.from(world.pos.subarray(from, to), (v, k) => v + shift[k % 3]));
   world.awake.forEach((_, other) => wake(world, other));
 }
 
 /**
- * @param {{world: object, colliders: object[], ray: (sx: number, sy: number) => {origin: number[], dir: number[]}}} options
+ * @param {{world: object, ray: (sx: number, sy: number) => {origin: number[], dir: number[]}}} options
+ *   The hand clears the world's colliders (world.colliders), which change as the figurine and the food move.
  */
-export function createHand({ world, colliders, ray }) {
+export function createHand({ world, ray }) {
   let held = null; // { garment, height, want, xy, sx, sy, script }
 
   // Cloth resting on what lies beneath is half a thickness above it; the hand holds it LIFT higher. The
   // whole held patch must clear it, not only the point under the pointer: held cloth passes through walls.
   const wantAt = (x, y) => supportUnder(
-    world, colliders, world.grip.offsets.map(([dx, dy]) => [x + dx, y + dy]),
+    world, world.colliders, world.grip.offsets.map(([dx, dy]) => [x + dx, y + dy]),
     { skip: held.garment, moving: false, reach: GARMENT_REACH },
   ) + world.thickness / 2 + LIFT;
 

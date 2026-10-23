@@ -100,6 +100,15 @@ export function createWorld({ garments, colliders = [], bounds, thickness = 6, s
   };
 }
 
+/**
+ * Replace the solid boxes the cloth collides with (the figurine and the food
+ * move, so their boxes are rebuilt as they do). Like the rest of this API it
+ * changes the world in place.
+ */
+export function setColliders(world, colliders) {
+  world.colliders = colliders.map(prepareCollider); // eslint-disable-line no-param-reassign
+}
+
 /** Wake garment g: from now on it moves, starting at rest. */
 export function wake(world, g) {
   const { offsets, counts, pos, prev, vel, anchor } = world;

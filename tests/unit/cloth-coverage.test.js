@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { buildMesh, particleNear } from '../../js/cloth/mesh.js';
 import { createWorld, setPositions } from '../../js/cloth/solver.js';
 import { bookCoverage, isBookUncovered, isExposed } from '../../js/cloth/coverage.js';
-import { CONTENTS } from '../../js/scene/geometry.js';
+import { CONTENTS, FOOD } from '../../js/scene/geometry.js';
+import { createBody, withPosition, bodyCollider } from '../../js/rigid/body.js';
 
 const book = CONTENTS.book;
 const top = 0.6 + book.thickness;
@@ -76,4 +77,25 @@ test('a particle is exposed unless cloth lies over it', () => {
   assert.equal(isExposed(w, at(0, 10, 20)), false, 'under the upper sheet');
   assert.equal(isExposed(w, at(0, 40, 20)), true, 'beyond its edge');
   assert.equal(isExposed(w, at(1, 10, 20)), true, 'the upper sheet itself');
+});
+
+/** A world whose only cloth lies far away. */
+function parkedWorld() {
+  const mesh = buildMesh({ id: 'sheet', size: [60, 60], grid: { cols: 10, rows: 10, cells: '1'.repeat(100) } });
+  const world = createWorld({ garments: [{ mesh, material: { stretchCompliance: 0, bendCompliance: 2e-4, friction: 0.5 } }], bounds: { min: [-3000, -900, 0], max: [1300, 1300, 900] }, thickness: 4.5 });
+  setPositions(world, 0, Float32Array.from(mesh.rest, (v, i) => v + [-2000, 0, 2.25][i % 3]));
+  return world;
+}
+
+test('food lying over the booklet covers it as cloth does', () => {
+  const world = parkedWorld();
+  const bowl = withPosition(createBody(FOOD[3]), [CONTENTS.book.x + 48, CONTENTS.book.y + 67, top]);
+  assert.equal(bookCoverage(world, CONTENTS.book), 0);
+  const share = bookCoverage(world, CONTENTS.book, { solids: [bodyCollider(bowl)] });
+  assert.ok(share > 0.05 && share < 0.3, `covered ${share}`);
+});
+
+test('a body beside the booklet, lower than its cover, covers nothing', () => {
+  const bowl = withPosition(createBody(FOOD[3]), [230, 80, 0]);
+  assert.equal(bookCoverage(parkedWorld(), CONTENTS.book, { solids: [bodyCollider(bowl)] }), 0);
 });

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildMesh } from '../../js/cloth/mesh.js';
 import {
-  createWorld, setPositions, step, grab, moveGrip, release, isSettled, centroid, sleepAll, sleep,
+  createWorld, setPositions, step, grab, moveGrip, release, isSettled, centroid, sleepAll, sleep, setColliders,
 } from '../../js/cloth/solver.js';
 
 const sheet = (cols = 6, rows = 6) => buildMesh({ id: 'sheet', size: [cols * 10, rows * 10], grid: { cols, rows, cells: '1'.repeat(cols * rows) } });
@@ -362,4 +362,14 @@ test('air drag is light: a falling garment keeps most of its speed', () => {
   for (let f = 0; f < 6; f += 1) step(w, 1 / 60); // exactly 0.1 s: run() would take a seventh step
   const dropped = 300 - Math.min(...zs(w));
   assert.ok(dropped > 0.95 * fall(0.1), `fell ${dropped.toFixed(1)} of ${fall(0.1).toFixed(1)} units in 0.1 s`);
+});
+
+test('colliders can be replaced: cloth then rests on a box that appeared beneath it', () => {
+  const mesh = buildMesh({ id: 'sheet', size: [60, 60], grid: { cols: 10, rows: 10, cells: '1'.repeat(100) } });
+  const w = createWorld({ garments: [{ mesh, material: { stretchCompliance: 0, bendCompliance: 2e-4, friction: 0.5 } }], bounds: { min: [-700, -600, 0], max: [1200, 1000, 700] }, thickness: 4.5 });
+  setPositions(w, 0, Float32Array.from(mesh.rest, (v, i) => v + [270, 120, 30][i % 3]));
+  setColliders(w, [{ kind: 'obb', name: 'box', center: [300, 150, 10], axes: [[1, 0, 0], [0, 1, 0], [0, 0, 1]], half: [40, 40, 10] }]);
+  for (let f = 0; f < 180; f += 1) step(w, 1 / 60);
+  assert.equal(w.colliders[0].name, 'box');
+  for (let i = 0; i < w.count; i += 1) assert.ok(w.pos[3 * i + 2] >= 20 + 2.25 - 0.3, `particle ${i} at ${w.pos[3 * i + 2]}`);
 });

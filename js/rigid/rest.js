@@ -75,3 +75,22 @@ export function settle(body, support, dt) {
 export function isResting(body, support) {
   return Math.abs(body.position[2] - support) < SETTLED && body.vz === 0;
 }
+
+/**
+ * The garments resting on `body`: those with a core particle over its inset
+ * footprint, higher than a thickness below its top. When the body moves
+ * away, they must wake and fall.
+ */
+export function clothOn(world, body) {
+  const { pos, garmentOf, core, thickness } = world;
+  const [cx, cy, z] = body.position;
+  const [hw, hd] = body.footprint.map((v) => (v / 2) * (1 - body.inset));
+  const above = z + body.height - thickness;
+  const found = new Set();
+  for (let i = 0; i < world.count; i += 1) {
+    if ((core && !core[i]) || pos[3 * i + 2] <= above || found.has(garmentOf[i])) continue;
+    const [lx, ly] = rotateZ([pos[3 * i] - cx, pos[3 * i + 1] - cy, 0], -body.rotate);
+    if (Math.abs(lx) <= hw && Math.abs(ly) <= hd) found.add(garmentOf[i]);
+  }
+  return [...found].sort((a, b) => a - b);
+}
