@@ -267,8 +267,30 @@ body[data-state="dark"] .floor-glow { opacity: 1; }
   transform: translateZ(var(--base)) rotate(var(--rot));
   pointer-events: none;
 }
-.tome .book-shadow { transform: translate3d(4px, 6px, .2px); filter: blur(4px); }
-.tome .book-edge.spine { background: var(--board); }
+/* the cast shadow: the outline of the book and its copy moved along the light (parcel.js), blurred by its height */
+.tome .book-shadow {
+  inset: min(0px, var(--sy)) min(0px, calc(-1 * var(--sx))) min(0px, calc(-1 * var(--sy))) min(0px, var(--sx));
+  transform: translateZ(.7px); /* above the floor (.floor sits at .5px) */
+  border-radius: 0;
+  background: none;
+  filter: blur(var(--sblur));
+}
+.book-shadow-shape { position: absolute; inset: 0; clip-path: var(--hull); background: rgba(30, 18, 8, .4); }
+/* where the book meets what it lies on */
+.book-contact {
+  position: absolute; inset: -1px;
+  transform: translateZ(.8px);
+  border-radius: 2px;
+  background: rgba(30, 18, 8, .5);
+  filter: blur(1.2px);
+}
+/* page edges facing away from the light (front, right) are darker; the spine is rounded */
+.tome .book-edge.front, .tome .book-edge.right { filter: brightness(.8); }
+.tome .book-edge.spine {
+  background:
+    linear-gradient(to bottom, rgba(0, 0, 0, .28), rgba(255, 255, 255, .2) 30%, rgba(255, 255, 255, .06) 55%, rgba(0, 0, 0, .32)),
+    var(--board);
+}
 .tome-top {
   position: absolute; inset: 0;
   transform: translateZ(calc(var(--bt) * 1px));
@@ -278,6 +300,14 @@ body[data-state="dark"] .floor-glow { opacity: 1; }
   box-shadow: inset 3px 0 5px rgba(0, 0, 0, .12), inset -1px -1px 0 rgba(0, 0, 0, .12);
 }
 .tome-cover { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* the cover's edges catch the light upper left and darken lower right (over the cover image, so it shows) */
+.tome-top::after {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, .28), inset -1px -1px 0 rgba(0, 0, 0, .22), inset 3px 0 5px rgba(0, 0, 0, .12);
+  pointer-events: none;
+}
 /* board colours match the covers' grounds in tools/generate_books.py */
 .tome[data-book="hunter-x-hunter"] { --board: #f3efe6; }
 .tome[data-book="dictionary"] { --board: #1f2c47; }

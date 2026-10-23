@@ -8,6 +8,7 @@ import {
   BOX, CONTENTS, BOOKS, FLAP_OPEN, baseOf, tapeCorners,
 } from './geometry.js';
 import { cssUrl } from '../core/env.js';
+import { castShadow, localOffset, shadowHull } from './shadow.js';
 
 const SIDES = ['front', 'back', 'left', 'right'];
 
@@ -83,20 +84,33 @@ function buildDesiccant() {
   return img;
 }
 
+/** CSS for a book's cast shadow: its offset along the light, the outline it and its shadow cover, and its softness. */
+function shadowStyle({ width, height, thickness, rotate }) {
+  const [sx, sy] = localOffset(castShadow(thickness), rotate);
+  const [x0, y0] = [Math.min(0, sx), Math.min(0, sy)]; // the shadow box starts here, so the outline is relative to it
+  const hull = shadowHull(width, height, [sx, sy]).map(([px, py]) => `${(px - x0).toFixed(1)}px ${(py - y0).toFixed(1)}px`);
+  return `--sx:${sx.toFixed(2)}px;--sy:${sy.toFixed(2)}px;--hull:polygon(${hull.join(', ')});`
+    + `--sblur:${(1 + 0.12 * thickness).toFixed(2)}px`;
+}
+
 /**
  * One of the owner's books: a block like the booklet. Its top is a board in
  * the cover's colour with the cover image on it, so a cover that fails to
- * load leaves a plain book rather than a hollow one.
+ * load leaves a plain book rather than a hollow one. It casts a shadow along
+ * the scene's light, as far as it is thick, and sits on a tight contact shadow.
  */
 function buildTome({ id, x, y, width, height, thickness, rotate, ...item }) {
   const tome = h('div', 'tome', { 'data-book': id });
   tome.style.cssText = `left:${x}px;top:${y}px;--bw:${width};--bh:${height};--bt:${thickness};`
-    + `--rot:${rotate}deg;--base:${baseOf(item)}px`;
+    + `--rot:${rotate}deg;--base:${baseOf(item)}px;${shadowStyle({ width, height, thickness, rotate })}`;
   const top = h('div', 'tome-top inside');
   const cover = h('img', 'tome-cover', { alt: '', draggable: 'false' });
   top.append(cover);
+  const shadow = h('div', 'book-shadow');
+  shadow.append(h('div', 'book-shadow-shape'));
   tome.append(
-    h('div', 'book-shadow'),
+    shadow,
+    h('div', 'book-contact'),
     ...['front', 'back', 'right'].map((s) => h('div', `book-edge pages ${s} inside`)),
     h('div', 'book-edge spine left inside'),
     top,

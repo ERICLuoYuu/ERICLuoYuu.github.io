@@ -31,9 +31,9 @@ export const CONTENTS = Object.freeze({
  * the floor.
  */
 export const BOOKS = Object.freeze([
-  Object.freeze({ id: 'dictionary', x: 202, y: 184, width: 70, height: 96, thickness: 20, rotate: -6 }),
+  Object.freeze({ id: 'dictionary', x: 202, y: 184, width: 70, height: 96, thickness: 28, rotate: -6 }),
   Object.freeze({ id: 'hunter-x-hunter', x: 212, y: 192, width: 50, height: 78, thickness: 7, rotate: 7, on: 'dictionary' }),
-  Object.freeze({ id: 'solitude', x: 282, y: 174, width: 58, height: 88, thickness: 10, rotate: 4 }),
+  Object.freeze({ id: 'solitude', x: 282, y: 174, width: 58, height: 88, thickness: 13, rotate: 4 }),
   Object.freeze({ id: 'siddhartha', x: 352, y: 166, width: 56, height: 86, thickness: 8, rotate: -5 }),
 ]);
 
