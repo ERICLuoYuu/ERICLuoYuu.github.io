@@ -2,21 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, stat } from 'node:fs/promises';
 import { buildMesh } from '../../js/cloth/mesh.js';
+import { webpSize } from './webp.js';
 
 const ROOT = new URL('../../', import.meta.url);
 const readJson = async (path) => JSON.parse(await readFile(new URL(path, ROOT), 'utf8'));
-
-/** Width and height of a WebP file, read from its header. */
-function webpSize(buffer) {
-  const chunk = buffer.toString('ascii', 12, 16);
-  if (chunk === 'VP8X') return [1 + buffer.readUIntLE(24, 3), 1 + buffer.readUIntLE(27, 3)];
-  if (chunk === 'VP8 ') return [buffer.readUInt16LE(26) & 0x3fff, buffer.readUInt16LE(28) & 0x3fff];
-  if (chunk === 'VP8L') {
-    const bits = buffer.readUInt32LE(21);
-    return [1 + (bits & 0x3fff), 1 + ((bits >> 14) & 0x3fff)];
-  }
-  throw new Error(`not a WebP file (${chunk})`);
-}
 
 const EXPECTED = ['qipao', 'blouse', 'mamianqun', 'tee-white', 'tee-breton', 'slip-skirt', 'ruched-top', 'floral-skirt'];
 // How long each garment is on the owner's figure (spec Revision B, B2), in parcel units.

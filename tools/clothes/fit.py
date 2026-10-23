@@ -1,4 +1,4 @@
-"""Garment scale: every garment is sized to fit the figure in the owner's pack.
+"""Garment scale: every garment is sized to fit the figure in the owner's figurine.
 
 Garments are drawn in pattern units; `fit` scales a pattern to the figure
 (spec Revision B, B2). Whatever the fit, the cloth grid is cut at no more
@@ -14,7 +14,7 @@ import numpy as np
 
 CELL = 6  # parcel units per cloth cell, at most
 
-# How long each garment is, in parcel units, measured on the figure in the pack
+# How long each garment is, in parcel units, measured on the figure in the owner's figurine
 # (head to sole ≈ 248 units in the 290-unit pack).
 LENGTH = {
     "qipao": 158,  # shoulder → mid-calf
