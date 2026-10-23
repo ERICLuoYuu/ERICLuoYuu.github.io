@@ -35,6 +35,24 @@ export const BOOKS = Object.freeze([
   Object.freeze({ id: 'siddhartha', x: 352, y: 166, width: 56, height: 86, thickness: 8, rotate: -5 }),
 ]);
 
+/**
+ * The owner's figurine in its clear bag, along the left wall the full depth of
+ * the box, and the food in a column beside it: rigid bodies (js/rigid) that
+ * visitors can move. `start` is the footprint's centre; `footprint` is [width
+ * along x, depth along y] before `rotate`; `inset` shrinks the collider for
+ * round things; `keepIn` keeps a body inside the walls when it is dragged.
+ */
+export const FIGURINE = Object.freeze({
+  id: 'figurine', label: 'figurine', footprint: [125, 290], height: 30, start: [68.5, 150], rotate: 0, inset: 0.04, keepIn: true,
+});
+export const FOOD = Object.freeze([
+  Object.freeze({ id: 'sushi', label: 'sushi', footprint: [52, 68], height: 12, start: [170, 56], rotate: 0, inset: 0, keepIn: false }),
+  Object.freeze({ id: 'fries', label: 'fries', footprint: [32, 40], height: 22, start: [170, 115], rotate: 0, inset: 0.05, keepIn: false }),
+  Object.freeze({ id: 'strawberries', label: 'strawberries', footprint: [44, 44], height: 16, start: [170, 162], rotate: 0, inset: 0.05, keepIn: false }),
+  Object.freeze({ id: 'bowl', label: 'fruit bowl', footprint: [42, 42], height: 18, start: [170, 210], rotate: 0, inset: 0.15, keepIn: false }),
+  Object.freeze({ id: 'dumplings', label: 'dumplings', footprint: [40, 40], height: 10, start: [170, 256], rotate: 0, inset: 0.15, keepIn: false }),
+]);
+
 /** Height of the surface an item lies on: the top of the book its `on` names, or the floor. */
 export function baseOf({ on }) {
   if (!on) return 0;
