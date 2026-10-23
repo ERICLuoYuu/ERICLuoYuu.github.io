@@ -79,5 +79,5 @@ test('the overhead eye sits above the box, looking down', () => {
   const frame = frameFor('overhead', 1280, 800);
   const { origin, dir } = screenRay(frame, { width: 1280, height: 800 }, 640, 400);
   assert.ok(origin[2] > BOX.height);
-  assert.ok(dir[2] < -0.99);
+  assert.ok(dir[2] < -0.96);
 });

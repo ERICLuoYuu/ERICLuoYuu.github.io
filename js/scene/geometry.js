@@ -67,7 +67,7 @@ export function rotateZ([x, y, z], deg) {
 /** Camera angles (degrees) and interior light for each view. */
 export const VIEWS = Object.freeze({
   threeQuarter: Object.freeze({ tilt: 54, spin: -34, light: 0 }),
-  overhead: Object.freeze({ tilt: 0, spin: -3, light: 1 }),
+  overhead: Object.freeze({ tilt: 14, spin: -3, light: 1 }),
 });
 
 
@@ -89,7 +89,6 @@ export function frameFor(view, vw, vh) {
   const angles = VIEWS[view];
   if (!angles) throw new Error(`Unknown view "${view}"`);
   const factor = PERSPECTIVE_FACTOR[view];
-  const magnification = factor / (factor - 1);
 
   if (view === 'threeQuarter') {
     const zoom = clamp(Math.min(vw / 640, (vh - 150) / 520), 0.45, 1.5);
@@ -102,12 +101,38 @@ export function frameFor(view, vw, vh) {
     };
   }
 
-  const zoom = clamp(
-    Math.min((vw * 0.94) / (BOX.width * magnification), ((vh - 96) * 0.92) / (BOX.depth * magnification)),
-    0.4,
-    3,
-  );
-  return { ...angles, zoom, panX: 0, panY: 0, perspective: factor * BOX.height * zoom };
+  // Tilted, the rim no longer projects as a centred rectangle: fit its projected box, then pan it to the middle.
+  const frame = (zoom, panX = 0, panY = 0) => ({ ...angles, zoom, panX, panY, perspective: factor * BOX.height * zoom });
+  const unit = rimBox(frame(1));
+  const zoom = clamp(Math.min((vw * 0.94) / unit.width, ((vh - 96) * 0.92) / unit.height), 0.4, 3);
+  let fitted = frame(zoom);
+  for (let i = 0; i < 3; i += 1) { // pan sits inside the perspective divide, so a few passes settle it
+    const { cx, cy } = rimBox(fitted);
+    const m = rimMagnification(fitted);
+    fitted = frame(zoom, fitted.panX - cx / m, fitted.panY - cy / m);
+  }
+  return fitted;
+}
+
+const RIM = [[0, 0], [BOX.width, 0], [BOX.width, BOX.depth], [0, BOX.depth]].map(([x, y]) => [x, y, BOX.height]);
+
+/**
+ * Where a parcel point lands on screen, relative to the viewport centre: the
+ * same maths as projection.js, which imports this file and so can't be imported here.
+ */
+function offsetOnScreen({ tilt, spin, zoom, panX, panY, perspective }, [x, y, z]) {
+  const [rx, ry, rz] = rotateX(rotateZ([x - BOX.width / 2, y - BOX.depth / 2, z], spin), tilt);
+  const scale = perspective / (perspective - rz * zoom);
+  return [(rx * zoom + panX) * scale, (ry * zoom + panY) * scale];
+}
+
+/** The rim's projected bounding box: its size and how far its centre misses the viewport centre. */
+function rimBox(frame) {
+  const points = RIM.map((p) => offsetOnScreen(frame, p));
+  const xs = points.map(([x]) => x);
+  const ys = points.map(([, y]) => y);
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  return { width: x1 - x0, height: y1 - y0, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
 }
 
 /** Tape corners in parcel coordinates (TL, TR, BR, BL) — matches tape space (0,0)…(width,tapeWidth). */

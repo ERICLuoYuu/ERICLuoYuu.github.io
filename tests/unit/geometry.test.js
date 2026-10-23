@@ -1,20 +1,30 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  BOX, CONTENTS, BOOKS, baseOf, frameFor, tapeCorners, rimMagnification,
+  BOX, CONTENTS, BOOKS, VIEWS, baseOf, frameFor, tapeCorners, rimMagnification,
 } from '../../js/scene/geometry.js';
+import { projectPoint } from '../../js/scene/projection.js';
 
 const screens = [
   { width: 1440, height: 900 }, { width: 1024, height: 768 }, { width: 390, height: 844 },
   { width: 844, height: 390 }, { width: 320, height: 568 },
 ];
 
-test('the overhead view keeps the whole box rim on screen', () => {
+test('the overhead view looks down at a slight tilt', () => {
+  assert.equal(VIEWS.overhead.tilt, 14);
+});
+
+test('tilted, the overhead view keeps the whole rim on screen and centred', () => {
+  const rim = [[0, 0], [BOX.width, 0], [BOX.width, BOX.depth], [0, BOX.depth]];
   for (const s of screens) {
     const f = frameFor('overhead', s.width, s.height);
-    const m = rimMagnification(f);
-    assert.ok(BOX.width * f.zoom * m <= s.width, `rim width fits ${s.width}x${s.height}`);
-    assert.ok(BOX.depth * f.zoom * m <= s.height, `rim depth fits ${s.width}x${s.height}`);
+    const points = rim.map(([x, y]) => projectPoint(f, s, [x, y, BOX.height]));
+    points.forEach(({ x, y }) => {
+      assert.ok(x >= 0 && x <= s.width, `x ${x.toFixed(0)} on ${s.width}x${s.height}`);
+      assert.ok(y >= 48 && y <= s.height - 48, `y ${y.toFixed(0)} on ${s.width}x${s.height}`);
+    });
+    const ys = points.map((p) => p.y);
+    assert.ok(Math.abs((Math.min(...ys) + Math.max(...ys)) / 2 - s.height / 2) <= 2, `centred on ${s.width}x${s.height}`);
   }
 });
 
