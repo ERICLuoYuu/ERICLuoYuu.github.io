@@ -27,15 +27,15 @@ function mayReach({ center, axes, half }, { position: [x, y], footprint: [w, d] 
 /**
  * The highest cloth surface under the body's inset footprint (grown by REACH):
  * a particle's centre plus a thickness, as grip.supportUnder counts cloth.
- * Only cloth below the body's middle holds it up: cloth lying on top of it
- * does not. With `moving: false`, cloth that is awake does not count either.
+ * Only cloth below `middle` counts. In the hand's view (`moving: false`)
+ * cloth that is awake does not count either: cloth that lay on the held body
+ * was woken when it was picked up.
  */
-function clothTop(world, body, moving) {
+function clothTop(world, body, moving, middle) {
   if (!world.count) return 0;
   const { pos, garmentOf, thickness, awake } = world;
-  const [cx, cy, z] = body.position;
+  const [cx, cy] = body.position;
   const [hw, hd] = body.footprint.map((v) => (v / 2) * (1 - body.inset) + REACH);
-  const middle = z + body.height / 2;
   let top = 0;
   for (let i = 0; i < world.count; i += 1) {
     const pz = pos[3 * i + 2];
@@ -49,13 +49,21 @@ function clothTop(world, body, moving) {
 /**
  * The support under `body` were it centred at (x, y): the highest collider
  * top or cloth surface beneath its inset footprint, never its own collider.
+ * Resting (`moving: true`), only what lies below the body's middle holds it
+ * up: cloth lying on top of it, or a body held above it, does not. In the
+ * hand's view (`moving: false`) everything beneath counts, however high.
  */
 export function supportOf(body, [x, y], { world, colliders, moving = true }) {
   const at = withPosition(body, [x, y, body.position[2]]);
   const own = `body:${body.id}`;
+  const middle = moving ? at.position[2] + body.height / 2 : Infinity;
   const near = colliders.filter((c) => c.name !== own && mayReach(c, at));
-  const solid = near.length > 0 ? supportUnder(NO_CLOTH, near, footprintPoints(at, SPACING), { reach: REACH }) : 0;
-  return Math.max(solid, clothTop(world, at, moving));
+  const points = near.length > 0 ? footprintPoints(at, SPACING) : [];
+  const solid = near.reduce((top, c) => {
+    const t = supportUnder(NO_CLOTH, [c], points, { reach: REACH });
+    return t <= middle ? Math.max(top, t) : top;
+  }, 0);
+  return Math.max(solid, clothTop(world, at, moving, middle));
 }
 
 /**

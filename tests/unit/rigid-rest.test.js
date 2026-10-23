@@ -17,6 +17,7 @@ function sheetWorld(x = -2000, y = 0) {
   sleepAll(world);
   return world;
 }
+const LET_GO = 400; // a body let go from the hand, above everything in or around the box
 const fall = (body, support, frames = 120) => Array.from({ length: frames }).reduce((b) => settle(b, support, 1 / 60), body);
 
 test('a body in the air falls and lands level; x and y never change', () => {
@@ -33,8 +34,9 @@ test('a support that appears under a resting body lifts it straight up', () => {
 
 test('it rests on the highest thing under any part of it: half on the dictionary, it lies on the dictionary', () => {
   const dict = BOOKS.find((b) => b.id === 'dictionary');
-  // a 10 × 10 block across the dictionary's left edge, clear of Hunter × Hunter lying on it (left edge ≈ x 212)
-  const block = createBody({ id: 'block', label: 'block', footprint: [10, 10], height: 5, start: [0, 0], rotate: 0, inset: 0, keepIn: false });
+  // a 10 × 10 block let go across the dictionary's left edge, clear of Hunter × Hunter lying on it (left edge ≈ x 212)
+  const def = { id: 'block', label: 'block', footprint: [10, 10], height: 5, start: [0, 0], rotate: 0, inset: 0, keepIn: false };
+  const block = withPosition(createBody(def), [0, 0, LET_GO]);
   const s = supportOf(block, [dict.x + 2, dict.y + 48], { world: sheetWorld(), colliders: boxColliders() });
   assert.ok(Math.abs(s - (baseOf(dict) + dict.thickness)) < 0.5, `support ${s}`);
 });
@@ -45,7 +47,7 @@ test('let go over a sloping open flap, food rests level on its highest point ben
   const [hingeLeft, , tipRight] = flapCorners('front');
   const at = [(hingeLeft[0] + tipRight[0]) / 2, (hingeLeft[1] + tipRight[1]) / 2];
   const world = sheetWorld();
-  const bowl = createBody(FOOD[3]);
+  const bowl = withPosition(createBody(FOOD[3]), [0, 0, LET_GO]);
   const s = supportOf(bowl, at, { world, colliders });
   const tops = footprintPoints(withPosition(bowl, [...at, 0])).map((p) => supportUnder(world, [flap], [p], { reach: 1 }));
   assert.ok(Math.abs(s - Math.max(...tops)) < 1, `rests at ${s}, flap top ${Math.max(...tops)}`);
@@ -55,8 +57,8 @@ test('let go over a sloping open flap, food rests level on its highest point ben
 test('stacked food drops straight down when the one beneath is dragged away', () => {
   const lower = withPosition(createBody(FOOD[3]), [300, 200, 0]);
   const world = sheetWorld();
-  let upper = withPosition(createBody(FOOD[4]), [300, 200, 0]);
-  upper = settle(upper, supportOf(upper, [300, 200], { world, colliders: [bodyCollider(lower)] }), 1 / 60);
+  const dropped = withPosition(createBody(FOOD[4]), [300, 200, 30]);
+  let upper = fall(dropped, supportOf(dropped, [300, 200], { world, colliders: [bodyCollider(lower)] }));
   assert.equal(upper.position[2], lower.height);
   for (let f = 0; f < 60; f += 1) upper = settle(upper, supportOf(upper, [300, 200], { world, colliders: [] }), 1 / 60);
   assert.deepEqual(upper.position, [300, 200, 0]);
@@ -76,6 +78,14 @@ test('a body is never its own support', () => {
   assert.equal(supportOf(sushi, [170, 56], { world: sheetWorld(), colliders: [bodyCollider(sushi)] }), 0);
 });
 
+test('a body held above a resting one never holds it up; in the hand\'s view it is beneath', () => {
+  const world = sheetWorld();
+  const lower = withPosition(createBody(FOOD[3]), [300, 200, 0]);
+  const upper = withPosition(createBody(FOOD[4]), [300, 200, 30]);
+  assert.equal(supportOf(lower, [300, 200], { world, colliders: [bodyCollider(upper)] }), 0);
+  assert.equal(supportOf(lower, [300, 200], { world, colliders: [bodyCollider(upper)], moving: false }), 30 + upper.height);
+});
+
 test('cloth lying on top of a body does not hold it up', () => {
   const sushi = createBody(FOOD[0]);
   const world = sheetWorld(170, 56);
@@ -89,4 +99,13 @@ test('cloth lying on a body is found; cloth beside it is not', () => {
   setPositions(on, 0, on.pos.map((v, i) => (i % 3 === 2 ? v + sushi.height : v)));
   assert.deepEqual(clothOn(on, sushi), [0]);
   assert.deepEqual(clothOn(sheetWorld(500, 200), sushi), []);
+});
+
+test("in the hand's view every sleeping cloth beneath counts, however high: food is carried over the pile", () => {
+  const fries = createBody(FOOD[1]); // still at its starting height, as the hand picked it up
+  const world = sheetWorld(300, 200);
+  setPositions(world, 0, world.pos.map((v, i) => (i % 3 === 2 ? v + 30 : v)));
+  sleepAll(world);
+  const s = supportOf(fries, [300, 200], { world, colliders: [], moving: false });
+  assert.ok(Math.abs(s - (30 + THICKNESS / 2 + THICKNESS)) < 0.01, `support ${s}`);
 });
