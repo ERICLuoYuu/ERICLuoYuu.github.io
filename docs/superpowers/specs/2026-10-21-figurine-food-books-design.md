@@ -1,6 +1,6 @@
 # Figurine, loose food and solid books — design
 
-Date: 2026-10-21 · Status: draft for the owner's review
+Date: 2026-10-21 · Status: approved and implemented (plan docs/superpowers/plans/2026-10-22-figurine-food-books.md)
 
 Builds on `2026-10-11-pack-and-garments-design.md`. The clothes pile, the
 booklet beneath it and the booklet lock stay as specified there; this document

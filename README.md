@@ -85,7 +85,7 @@ crisp on high-density screens). SVG, PNG, JPG and WebP all work.
 | `flapLong` | 420 × 150 | the two long top flaps, outside | the tape runs along the 150 px edge |
 | `flapShort` | 300 × 150 | the two short top flaps, outside | mostly hidden under the long flaps |
 | `boxInside` | 420 × 220 | inner walls and the underside of every flap | seen in the dark and overhead views |
-| `boxFloor` | 420 × 300 | the floor inside the box | the pack, the booklet and the books lie on it |
+| `boxFloor` | 420 × 300 | the floor inside the box | the figurine, the food, the booklet and the books lie on it |
 | `bookCover` | 360 × 500 | the booklet's cover (in the box and when it flies out) | leave the top ~30 % calm: the title is written there |
 | `endpaper` | 360 × 500 | inside of the cover, first left page | the owner label sits at the bottom |
 | `desiccant` | 24 × 34 | the silica-gel packet in the front-right corner of the floor | redrawn without any maker's name (`python tools/generate_props.py`) |
@@ -100,32 +100,58 @@ edges or a spine, ask and they can become layers too.
 If a path is wrong or a file is missing, the site falls back to the built-in
 art for that layer and the console says which file it could not find.
 
-### 4. Your vacuum pack — `assets/photo/` + `content/site.js` → `photo`
+### 4. Your figurine and the food — `assets/figurine/`, `assets/food/` + `content/site.js` → `figurine`, `food`
 
-Your artwork lies in the box as a vacuum-sealed pack along the left wall, the
-full depth of the box. Visitors can pick it up anywhere and move it: it is
-heavy and stiff, flexes a little and settles flat. `tools/prepare_pack.py`
-cuts it out of its white canvas and keeps the plastic see-through:
+Along the left wall you lie as a small painted figurine, sealed in a
+crinkled clear bag; beside it five loose pieces of food (sushi, fries,
+strawberries, a fruit bowl and dumplings). Visitors can pick each one up and
+move it. It only slides, never turns or tips, and it comes to rest level on
+whatever lies beneath: the floor, a book, the clothes, another piece. The
+figurine stays inside the box; the food may go anywhere, even out onto the
+flaps or the table.
 
-    python tools/prepare_pack.py F:/CXY.png assets/photo --solid 950,1200,44,40
-    npm run clothes
+**The figurine.** It is made from your photo with an image model, then
+finished by a tool:
 
-- Everything coloured or dark inside the pack stays solid; `--solid x,y,rx,ry`
-  (in the artwork's pixels) marks pale solids the colour test misses — here
-  the white sandal on the left foot.
-- `--film 0.45` sets how see-through the clear plastic is (lower shows more
-  of what lies beneath). Laid back over white, the result always equals your
-  artwork; the tool refuses to write if it would not.
-- An image that already has transparency is used as it is.
-- It writes `vacuum-pack.webp`, `vacuum-pack-relief.webp` (where the contents
-  bulge the plastic, lit by the box's lamp) and `vacuum-pack-shade.webp` (the
-  same light and shade, for browsers without WebGL2, which show a still pack).
-  `npm run clothes` then rebuilds the pack's cloth body
-  (`tools/pack_body.py`). The pack is 181 × 290 units (`CONTENTS.pack` in
-  `js/scene/geometry.js`); a new picture should keep the 0.62 aspect.
+1. Put your OpenRouter key in `F:\parcel-art\.env`, on a line that names it
+   `OPENROUTER_API_KEY`. That folder is outside the repository; the key is
+   never committed, printed or pasted anywhere.
+2. Generate candidates from your photo (a 1600 px copy of it) with the prompt
+   in `docs/superpowers/plans/2026-10-22-figurine-food-books.md`, Task 1: a
+   real hand-painted resin figure of you, lying on its back on light grey,
+   photographed from above. The candidates go to `F:\parcel-art\candidates\`;
+   pick the one that looks most like you.
+3. Make the four pictures from your pick:
 
-`photo.alt` describes it for screen-reader users — the current text is a
-draft for you to check and reword.
+       python tools/prepare_figurine.py <chosen.png> assets/figurine
+
+   It cuts the figure off its plain background (`--u2net PATH` uses the u2net
+   model when the background is not plain), stands it upright
+   (`--turn auto|0|90|-90|180`), sizes it to the figure the clothes were
+   fitted to (248 units from head to sole), matches it to the box's light and
+   wraps it in a clear pillow bag with crimped seals. It writes
+   `figurine.webp`, `figurine-relief.webp` (its height, for the 3D surface),
+   `wrap.webp` and `wrap-relief.webp` (the bag), each 500 × 1160 px: the
+   figurine's 125 × 290-unit footprint at 4 px a unit.
+
+Until you pick, the figurine is a **stand-in** stamped PLACEHOLDER, made by
+the same tool from a plain drawn figure.
+
+**The food.** It comes from your photos, cut out without brands:
+
+    python tools/prepare_food.py <folder with the photos> assets/food
+
+It writes `<id>.webp` and `<id>-relief.webp` for each piece, and
+`food.json`. Brand marks are painted out first: each box in `ITEMS` (in
+`tools/prepare_food.py`) is filled from the colours of a thin ring around it,
+so the fries' "M" becomes the packet's own red, the strawberries' label
+blank paper and the chopsticks' wrapper plain. The sizes and heights match
+`FOOD` in `js/scene/geometry.js`.
+
+`figurine.alt` and each `food[].alt` in `content/site.js` describe them for
+screen-reader users. The current texts are drafts marked
+"[Draft — check this]": reword them, then remove the mark. Without WebGL 2,
+the figurine and the food lie still as pictures.
 
 ### 5. Your handwriting
 
@@ -156,13 +182,15 @@ booklet opens once most of its cover is uncovered; the rule is
 `npm run clothes` redraws the garments (`tools/generate_clothes.py`, with the
 drawing code in `tools/clothes/`: `canvas.py`, `fabrics.py`, `details.py`,
 `motifs.py`, `traditional.py`, `modern.py`, and `fit.py`, which sizes every
-garment to the figure in your pack), adds the pack's body and settles the
-pile (`tools/build-pile.mjs`). Each garment is a colour picture with no
+garment to the figure in your figurine) and settles the pile around the
+figurine and the food (`tools/build-pile.mjs`). Each garment is a colour picture with no
 painted shading plus a relief map (seams, hems, piping, closures, weave)
 that the site lights with the box's lamp. `--only qipao,blouse` redraws just
-those. The pile is kept only if it hides the booklet, spares the pack and
-shows at least six garments' signature features. `npm run test:py` tests the
-Python tools; `node tools/shots.mjs` takes overhead screenshots into `shots/`.
+those. The pile is kept only if it hides the booklet, leaves the figurine
+and the food bare and shows at least six garments' signature features. `npm run test:py` tests the
+Python tools; `node tools/shots.mjs` takes screenshots into `shots/`: the overhead view,
+close-ups of the figurine and the books, and the fruit bowl held over the
+clothes.
 The Python tools need Pillow, NumPy and SciPy (and pytest for the tests).
 
 The `label` in `assets/clothes/garments.json` is what screen
@@ -176,14 +204,16 @@ Four books lie in the lower right: *Hunter × Hunter*, a German-Chinese
 dictionary, *One Hundred Years of Solitude* (Gabriel García Márquez) and
 *Siddhartha* (Hermann Hesse). `npm run books` (`tools/generate_books.py`)
 draws their covers in the site's own fonts — titles only, no publisher
-marks. Their places and sizes are `BOOKS` in `js/scene/geometry.js`; each
+marks. Each book is as thick as the real one and casts a shadow along the
+box's light. Their places and sizes are `BOOKS` in `js/scene/geometry.js`; each
 book's `alt` text in `content/site.js` is what screen readers say.
 
 ### Still needed from you
 
 - [ ] The booklet text in `content/book.md`, the cover title (`bookTitle`) and `ownerName`
-- [ ] Check and reword the pack's `alt` description (`photo.alt`)
-- [ ] Artwork: `questionMark` (and optionally `instruction`) — the box, booklet, pack, books and desiccant are done
+- [ ] Pick your figurine from the candidates and run `tools/prepare_figurine.py` on it (the current one is a stand-in)
+- [ ] Check and reword the figurine's and the food's `alt` descriptions (`figurine.alt`, `food[].alt`)
+- [ ] Artwork: `questionMark` (and optionally `instruction`) — the box, booklet, food, books and desiccant are done
 - [ ] Your handwriting (font or images), if you want it instead of Caveat
 - [ ] The site title and description (`meta` in `content/site.js`)
 
@@ -192,8 +222,9 @@ book's `alt` text in `content/site.js` is what screen readers say.
 | Part | File |
 | --- | --- |
 | stages and transitions (sealed → cutting → dark → overhead → book) | `js/core/state-machine.js`, `js/flow.js` |
-| the 3D parcel and camera | `js/scene/*`, `css/scene.css` |
-| the clothes and the pack: cloth physics (the pack a heavy, stiff film body), a smooth surface drawn finer than simulated, relief maps lit by the box's lamp, textures at the screen's resolution, shadows, dragging, keyboard moves, the booklet lock | `js/cloth/*` |
+| the 3D parcel and camera (looking down into the box, tilted 14°); the books' cast and contact shadows | `js/scene/*`, `css/scene.css` |
+| the clothes: cloth physics, a smooth surface drawn finer than simulated, relief maps lit by the box's lamp, textures at the screen's resolution, shadows, dragging, keyboard moves, the booklet lock | `js/cloth/*` |
+| the figurine and the food: rigid bodies that only slide and rest level on what lies beneath, drawn as heightfields from their relief maps in the same light and shadows, the bag a clear film over the figurine | `js/rigid/*`, `js/gl/common.js` |
 | cutting (mouse, touch, keyboard) and the traced slit | `js/tape/*` |
 | the book: pagination, page turning, the flying cover | `js/book/*`, `css/book.css` |
 | sound, preloading, controls | `js/audio/sound.js`, `js/loader/preload.js`, `js/ui/controls.js` |
@@ -232,4 +263,4 @@ Regenerate the built-in box art, placeholders, textures and sounds with `npm run
 - Cloth simulation: after Matthias Müller's [Ten Minute Physics](https://matthias-research.github.io/pages/) cloth demos, MIT (notice in `js/cloth/hash.js`).
 - Box art, placeholder art, textures and sounds: generated by `tools/generate_placeholders.py`.
 - Clothes, booklet drawings, the desiccant packet and the hand cursors: generated by `tools/generate_clothes.py`, `tools/generate_manual.py`, `tools/generate_props.py` and `tools/generate_cursors.py`.
-- The pack: the owner's artwork, cut out by `tools/prepare_pack.py`. Book covers: drawn by `tools/generate_books.py` in the bundled Noto Sans (SIL OFL).
+- The figurine: generated from the owner's photo with an image model and finished by `tools/prepare_figurine.py` (for now a stand-in). The food: the owner's photos, cut out by `tools/prepare_food.py`. Book covers: drawn by `tools/generate_books.py` in the bundled Noto Sans (SIL OFL).

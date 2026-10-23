@@ -3,8 +3,8 @@
  *  YOUR PARCEL — edit this file to make the site yours.
  * ─────────────────────────────────────────────────────────────────────────
  *
- *  • Put your files in assets/art, assets/photo, assets/handwriting or
- *    assets/sounds, then change the matching path below.
+ *  • Put your files in assets/art, assets/figurine, assets/food,
+ *    assets/handwriting or assets/sounds, then change the matching path below.
  *  • Paths are relative to index.html, with no leading "/", so the site works
  *    both at https://<you>.github.io/ and at https://<you>.github.io/<repo>/.
  *  • Anything still pointing at assets/placeholders/… is a stand-in.
