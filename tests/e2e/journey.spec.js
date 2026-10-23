@@ -17,6 +17,9 @@ test.describe('the whole parcel, start to finish', () => {
     await waitForState(page, 'overhead');
     const light = await page.$eval('.parcel', (el) => el.style.getPropertyValue('--light'));
     expect(Number(light)).toBeCloseTo(1, 2);
+    const figurine = await page.evaluate(() => window.__parcel.clothes().rigid.find((b) => b.id === 'figurine'));
+    expect(figurine?.resting, 'the figurine lies in the box').toBe(true);
+    expect(figurine.centre[0] > 0 && figurine.centre[0] < 420 && figurine.centre[1] > 0 && figurine.centre[1] < 300).toBe(true);
 
     await clearWithMouse(page);
     const bare = await bareBookletPoint(page);

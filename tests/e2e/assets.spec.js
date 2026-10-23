@@ -25,6 +25,19 @@ test('the desiccant packet lies on the box floor', async ({ page }) => {
   expect(problems).toEqual([]);
 });
 
+test('the figurine and the food load, as still pictures and as bodies that can be moved', async ({ page }) => {
+  const problems = await openSite(page, '?jump=overhead');
+  await waitForState(page, 'overhead');
+  const pictures = await page.$$eval('.solid img', (imgs) => imgs.map((img) => ({
+    id: img.closest('.solid').dataset.id, ok: img.complete && img.naturalWidth > 0,
+  })));
+  expect(pictures.map((p) => p.id)).toEqual(['figurine', 'figurine', 'sushi', 'fries', 'strawberries', 'bowl', 'dumplings']);
+  pictures.forEach((p) => expect(p.ok, p.id).toBe(true));
+  const bodies = await page.evaluate(() => window.__parcel.clothes().rigid.map((b) => b.id));
+  expect(bodies, 'the WebGL layer loaded every picture and relief').toEqual(['figurine', 'sushi', 'fries', 'strawberries', 'bowl', 'dumplings']);
+  expect(problems).toEqual([]);
+});
+
 test('a missing artwork file falls back to the built-in art', async ({ page }) => {
   await page.route('**/content/site.js', async (route) => {
     const original = await (await route.fetch()).text();

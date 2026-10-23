@@ -120,10 +120,12 @@ test.describe('clothes in the box (desktop)', () => {
     await waitForSettled(page);
   });
 
-  test('restarting mid-drag gives a sealed parcel and the packed pile', async ({ page }) => {
+  test('restarting mid-drag gives a sealed parcel, the packed pile and every body in its place', async ({ page }) => {
     const problems = await openSite(page, '?jump=overhead');
     await waitForState(page, 'overhead');
-    const packed = (await clothesOf(page)).garments.map((g) => g.centre);
+    const arrived = await clothesOf(page);
+    const packed = arrived.garments.map((g) => g.centre);
+    const placed = arrived.rigid.map((b) => b.centre);
     const point = await pointOn(page);
     await dragMouse(page, point, { x: point.x - 120, y: point.y }, { release: false });
     await page.locator('#restart').dispatchEvent('click');
@@ -133,6 +135,8 @@ test.describe('clothes in the box (desktop)', () => {
     expect(status.held).toBeNull();
     expect(status.visible).toBe(false);
     expect(status.garments.map((g) => g.centre)).toEqual(packed);
+    expect(status.rigid.map((b) => b.centre)).toEqual(placed);
+    expect(status.heldBody).toBeNull();
     expect(problems).toEqual([]);
   });
 
