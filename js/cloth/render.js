@@ -1,5 +1,5 @@
 /**
- * WebGL2 drawing for the clothes layer, in four passes:
+ * WebGL2 drawing for the clothes layer, in three passes:
  *
  *   1. shadow   — the cloth's depth as seen from the light, into a 2048² map
  *                 (only redrawn when cloth has moved; the light never does);
@@ -7,10 +7,7 @@
  *                 the depth buffer only, so cloth behind them is hidden; their
  *                 colour is a soft black tint wherever cloth shades them;
  *   3. cloth    — each garment, textured, lit, shadowed and sharpened at its
- *                 cut-out edges with alpha-to-coverage;
- *   4. film     — the pack's clear film, last, blended over whatever lies
- *                 beneath; it writes no depth, so cloth beneath shows through
- *                 it and cloth above (drawn already) hides it.
+ *                 cut-out edges with alpha-to-coverage.
  *
  * Everything is in parcel units; projection.js and shading.js provide the
  * matrices. This module only talks to WebGL.
@@ -115,7 +112,6 @@ uniform vec3 uEye;
 uniform vec3 uLightDir;
 uniform float uSheen;
 uniform float uLightLevel;
-uniform float uFilm;
 in vec3 vPos;
 in vec3 vNormal;
 in vec3 vShadow;
@@ -145,9 +141,8 @@ vec3 relief(vec3 n) {
 
 void main() {
   vec4 tex = texture(uTex, vUv); // premultiplied on upload
-  // garments: a crisp cut-out edge, about one pixel wide, whatever the zoom;
-  // the pack's clear film: its own opacity, blended over what lies beneath
-  float alpha = uFilm > 0.5 ? tex.a : clamp((tex.a - 0.5) / max(fwidth(tex.a), 1e-4) + 0.5, 0.0, 1.0);
+  // a crisp cut-out edge, about one pixel wide, whatever the zoom
+  float alpha = clamp((tex.a - 0.5) / max(fwidth(tex.a), 1e-4) + 0.5, 0.0, 1.0);
   if (alpha < 0.01) discard;
   vec3 base = tex.rgb / max(tex.a, 1e-3);
 
@@ -163,9 +158,7 @@ void main() {
 
   vec3 color = base * shade * mix(0.62, 1.0, sun) * vCavity * (back ? 0.78 : 1.0) + sheen;
   color = mix(color, vec3(${DARK.map((c) => c.toFixed(4)).join(', ')}), (1.0 - uLightLevel) * 0.95);
-  // the film's gloss lies on top of whatever shows through it, so it adds opacity too
-  float gloss = uFilm * pow(max(0.0, dot(n, h)), 80.0) * uSheen * sun * uLightLevel;
-  outColor = vec4(color * alpha + gloss, min(1.0, alpha + gloss));
+  outColor = vec4(color * alpha, alpha);
 }`;
 
 function compile(gl, type, source, name) {
@@ -256,7 +249,7 @@ function vertexBuffer(gl, location, size, data, usage) {
 }
 
 /** Buffers, textures and scratch arrays for one garment, drawn as its smooth surface. */
-function createGarment(gl, mesh, { image, relief, reliefTexel, sheen, bump, film }, anisotropy) {
+function createGarment(gl, mesh, { image, relief, reliefTexel, sheen, bump }, anisotropy) {
   const smooth = createSmoother(mesh);
   if (smooth.count > 65535) throw new Error('a garment has too many points to draw with 16-bit indices');
   const vao = gl.createVertexArray();
@@ -268,7 +261,6 @@ function createGarment(gl, mesh, { image, relief, reliefTexel, sheen, bump, film
     smooth,
     sheen,
     bump,
-    film: Boolean(film),
     vao,
     positions,
     normals,
@@ -302,7 +294,7 @@ function createOccluders(gl, quads) {
 /**
  * @param gl         a WebGL2 context (antialias on, premultiplied alpha)
  * @param meshes     each garment's mesh (mesh.js), in world order
- * @param looks      each garment's {image, relief (or null), reliefTexel, sheen 0…1, bump, film}
+ * @param looks      each garment's {image, relief (or null), reliefTexel, sheen 0…1, bump}
  * @param occluders  quads of the box's solid surfaces (solids.occluderQuads)
  * @returns {{update(world, garments:number[]): void, draw(view): void}}
  */
@@ -406,21 +398,9 @@ export function createRenderer(gl, { meshes, looks, occluders }) {
       gl.bindVertexArray(garment.vao);
       gl.drawElements(gl.TRIANGLES, garment.count, gl.UNSIGNED_SHORT, 0);
     };
-    gl.uniform1f(cloth.uniforms.uFilm, 0);
     gl.enable(gl.SAMPLE_ALPHA_TO_COVERAGE);
-    garments.filter((garment) => !garment.film).forEach(drawBody);
+    garments.forEach(drawBody);
     gl.disable(gl.SAMPLE_ALPHA_TO_COVERAGE);
-    const films = garments.filter((garment) => garment.film);
-    if (films.length > 0) {
-      // One translucent body only, so no sorting among films is needed (a second would need it).
-      gl.enable(gl.BLEND);
-      gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-      gl.depthMask(false);
-      gl.uniform1f(cloth.uniforms.uFilm, 1);
-      films.forEach(drawBody);
-      gl.depthMask(true);
-      gl.disable(gl.BLEND);
-    }
     gl.bindVertexArray(null);
   }
 

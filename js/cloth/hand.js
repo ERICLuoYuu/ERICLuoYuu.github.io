@@ -15,7 +15,6 @@ import {
 } from './solver.js';
 import { supportHeight, supportUnder, gripCluster, onPlane } from './grip.js';
 import { BOX } from '../scene/geometry.js';
-import { WALL } from '../scene/solids.js';
 
 const LIFT = 12; // the hand holds cloth just clear of what lies beneath: the garment slides over the pile, keeping its shape
 const LOWER_RATE = 5; // per second: how quickly the hand sinks back after clearing something tall
@@ -29,11 +28,9 @@ const CLEAR = 290; // past this distance beyond a wall, cloth lies on the table
 const TOSS_TIME = 0.6; // let go beyond the rim, the hand carries on out to CLEAR in this many seconds
 const DWELL = 0.3; // at the end of a scripted carry the hand waits this long, so the garment swings in beneath it
 const OVERTIME = 1.5; // a scripted carry lets go at the latest this long after its path ends
-const AIR = 0.5; // a wide hold over the floor keeps this much air between its patch and a wall
 
 const smooth = (t) => t * t * (3 - 2 * t);
 const isOutside = ([x, y]) => x < 0 || x > BOX.width || y < 0 || y > BOX.depth;
-const isOverFloor = ([x, y]) => x > WALL && x < BOX.width - WALL && y > WALL && y < BOX.depth - WALL;
 const clampReach = ([x, y, z]) => [
   Math.min(REACH.max[0], Math.max(REACH.min[0], x)),
   Math.min(REACH.max[1], Math.max(REACH.min[1], y)),
@@ -52,7 +49,7 @@ export function topParticle(world, g) {
 /**
  * Where a keyboard move takes garment g: over the nearer of the two gentle
  * flaps, right or front, onto the table beyond. Never left, where the
- * owner's pack lies, nor over the steep back flap.
+ * figurine lies, nor over the steep back flap.
  */
 export function asideTarget(world, g) {
   const [x, y] = centroid(world, g);
@@ -77,39 +74,20 @@ export function dropAt(world, colliders, g, [x, y]) {
 }
 
 /**
- * @param {{world: object, colliders: object[], ray: (sx: number, sy: number) => {origin: number[], dir: number[]},
- *          holds?: ({radius: number, lift: number}|undefined)[]}} options
- *   holds[g]: how the hand holds body g — the pack: a wide patch lifted a little. Garments use the default.
+ * @param {{world: object, colliders: object[], ray: (sx: number, sy: number) => {origin: number[], dir: number[]}}} options
  */
-export function createHand({ world, colliders, ray, holds = [] }) {
-  let held = null; // { garment, lift, reach, patch, height, want, xy, sx, sy, script }
+export function createHand({ world, colliders, ray }) {
+  let held = null; // { garment, height, want, xy, sx, sy, script }
 
-  // Cloth resting on what lies beneath is half a thickness above it; the hand holds it `lift` higher. The
-  // whole held patch must clear it, not only the point under the pointer: held cloth passes through walls,
-  // so a wide hold (the pack) would push its edge into one.
+  // Cloth resting on what lies beneath is half a thickness above it; the hand holds it LIFT higher. The
+  // whole held patch must clear it, not only the point under the pointer: held cloth passes through walls.
   const wantAt = (x, y) => supportUnder(
     world, colliders, world.grip.offsets.map(([dx, dy]) => [x + dx, y + dy]),
-    { skip: held.garment, moving: false, reach: held.reach },
-  ) + world.thickness / 2 + held.lift;
-
-  /**
-   * Over the floor, a wide hold (the pack) keeps its whole patch inside the walls: held cloth passes
-   * through them, and the pack presses against a wall rather than riding up it. With the pointer over a
-   * wall it rises over the rim like any garment.
-   */
-  function keepIn([x, y]) {
-    if (!held.patch || !isOverFloor([x, y])) return [x, y];
-    const margin = WALL + world.thickness / 2 + AIR;
-    const { left, right, back, front } = held.patch;
-    return [
-      Math.min(BOX.width - margin - right, Math.max(margin - left, x)),
-      Math.min(BOX.depth - margin - front, Math.max(margin - back, y)),
-    ];
-  }
+    { skip: held.garment, moving: false, reach: GARMENT_REACH },
+  ) + world.thickness / 2 + LIFT;
 
   /** Move the hand to (x, y) at its height, rising first if something below is taller. */
-  function place(point) {
-    const [x, y] = keepIn(point);
+  function place([x, y]) {
     const want = wantAt(x, y);
     if (want > held.height) held.height = want;
     held.want = want;
@@ -120,15 +98,13 @@ export function createHand({ world, colliders, ray, holds = [] }) {
   /** Put the hand where the pointer's line of sight meets its height. */
   function aim() {
     const sight = ray(held.sx, held.sy);
-    const at = (point) => [...keepIn(point), point[2]];
     let target = onPlane(sight, held.height);
     if (!target) return;
-    target = at(target);
     const want = wantAt(target[0], target[1]);
     if (want > held.height) {
       held.height = want;
       const higher = onPlane(sight, want);
-      if (higher) target = at(higher);
+      if (higher) target = higher;
     }
     held.want = want;
     held.xy = [target[0], target[1]];
@@ -146,19 +122,9 @@ export function createHand({ world, colliders, ray, holds = [] }) {
 
   function take(garment, ids, point) {
     drop();
-    // A body with a hold of its own (the pack) looks only directly beneath its held patch, within a
-    // particle's radius: it lies along the walls, and a wall merely nearby must not lift it.
-    const { radius, lift, reach } = holds[garment]
-      ? { reach: world.thickness / 2, ...holds[garment] }
-      : { radius: GRIP_RADIUS, lift: LIFT, reach: GARMENT_REACH };
-    hold(world, garment, gripCluster(world, { garment, ids, point }, radius), point);
-    const [dx, dy] = [0, 1].map((k) => world.grip.offsets.map((offset) => offset[k]));
+    hold(world, garment, gripCluster(world, { garment, ids, point }, GRIP_RADIUS), point);
     held = {
       garment,
-      lift,
-      reach,
-      // a wide hold's extent around the hold point, kept inside the walls (keepIn)
-      patch: holds[garment] ? { left: Math.min(...dx), right: Math.max(...dx), back: Math.min(...dy), front: Math.max(...dy) } : null,
       height: point[2],
       want: 0,
       xy: [point[0], point[1]],

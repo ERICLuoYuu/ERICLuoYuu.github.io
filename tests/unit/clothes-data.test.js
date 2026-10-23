@@ -19,14 +19,14 @@ function webpSize(buffer) {
 }
 
 const EXPECTED = ['qipao', 'blouse', 'mamianqun', 'tee-white', 'tee-breton', 'slip-skirt', 'ruched-top', 'floral-skirt'];
-// How long each garment is on the figure in the pack (spec Revision B, B2), in parcel units.
+// How long each garment is on the owner's figure (spec Revision B, B2), in parcel units.
 const LENGTH = {
   qipao: 158, blouse: 83, mamianqun: 127, 'tee-white': 83, 'tee-breton': 83, 'slip-skirt': 103, 'ruched-top': 55, 'floral-skirt': 103,
 };
 
 test('garments.json lists the eight garments with textures, grids and materials', async () => {
   const data = await readJson('assets/clothes/garments.json');
-  const garments = data.garments.filter((g) => g.kind !== 'film');
+  const { garments } = data;
   assert.equal(data.spacing, 6);
   assert.deepEqual(garments.map((g) => g.id), EXPECTED);
   await Promise.all(garments.map(async (g) => {
@@ -43,7 +43,7 @@ test('garments.json lists the eight garments with textures, grids and materials'
   }));
 });
 
-test('pile.json is a settled pile that hides the booklet and leaves the pack in view', async () => {
+test('pile.json is a settled pile that hides the booklet', async () => {
   const { createWorld, setPositions } = await import('../../js/cloth/solver.js');
   const { bookCoverage, isExposed } = await import('../../js/cloth/coverage.js');
   const { particleNear } = await import('../../js/cloth/mesh.js');
@@ -74,12 +74,19 @@ test('pile.json is a settled pile that hides the booklet and leaves the pack in 
     world.offsets[g] + particleNear(meshes[g], [signature[0] * size[0], signature[1] * size[1]])));
   assert.ok(seen.length >= 6, `signatures in view: ${seen.map((g) => g.id).join(', ')}`);
   assert.ok(bookCoverage(world, CONTENTS.book) >= 0.85, 'the booklet is hidden');
-  assert.ok(bookCoverage(world, CONTENTS.pack) <= 0.25, 'the pack stays mostly visible');
 });
 
-test('every garment fits the figure in the pack', async () => {
+test('the clothes data hold garments only: the pack is gone', async () => {
   const data = await readJson('assets/clothes/garments.json');
-  data.garments.filter((g) => g.kind !== 'film').forEach((g) => {
+  const pile = await readJson('assets/clothes/pile.json');
+  assert.deepEqual(data.garments.map((g) => g.id), EXPECTED);
+  assert.ok(data.garments.every((g) => g.kind === undefined && g.hold === undefined));
+  assert.deepEqual(pile.garments.map((g) => g.id), EXPECTED);
+});
+
+test("every garment fits the owner's figure", async () => {
+  const data = await readJson('assets/clothes/garments.json');
+  data.garments.forEach((g) => {
     const target = LENGTH[g.id];
     assert.ok(Math.abs(g.size[1] - target) <= 0.1 * target, `${g.id}: ${g.size[1]} long, the figure wants ${target}`);
     assert.ok(Number.isFinite(g.pxPerUnit) && g.pxPerUnit > 0, `${g.id}.pxPerUnit`);
@@ -94,26 +101,10 @@ test('simulating everything at once costs no more than the spec allows', async (
   assert.ok(particles * DEFAULTS.substeps <= 55000, `${particles} particles × ${DEFAULTS.substeps} substeps`);
 });
 
-test('the pack is the last body: a heavy, stiff film the size of the pack in the box', async () => {
-  const { CONTENTS } = await import('../../js/scene/geometry.js');
-  const data = await readJson('assets/clothes/garments.json');
-  const pile = await readJson('assets/clothes/pile.json');
-  const pack = data.garments.at(-1);
-  assert.deepEqual([pack.id, pack.kind], ['pack', 'film']);
-  assert.equal(data.garments.filter((g) => g.kind === 'film').length, 1, 'one film body');
-  assert.deepEqual(pack.size, [CONTENTS.pack.width, CONTENTS.pack.height]);
-  assert.ok(pack.material.mass >= 4, 'heavy');
-  assert.ok(pack.material.bendCompliance <= 1e-6, 'stiff');
-  assert.deepEqual(pack.hold, { radius: 30, lift: 6 });
-  const gap = Math.hypot(pack.size[0] / pack.grid.cols, pack.size[1] / pack.grid.rows) / 2;
-  assert.ok(gap < pile.thickness, `a cell's middle lies ${gap.toFixed(2)} from its particles`);
-  for (const path of [pack.texture, pack.relief]) assert.ok((await stat(new URL(path, ROOT))).size > 1000, `${path} exists`);
-});
-
 test('redrawn garments have an aligned relief map, a signature and core cells inside their cloth', async () => {
   const data = await readJson('assets/clothes/garments.json');
-  const redrawn = data.garments.filter((g) => g.relief && g.kind !== 'film');
-  assert.equal(redrawn.length, data.garments.filter((g) => g.kind !== 'film').length, 'every garment is drawn with relief');
+  const redrawn = data.garments.filter((g) => g.relief);
+  assert.equal(redrawn.length, data.garments.length, 'every garment is drawn with relief');
   await Promise.all(redrawn.map(async (g) => {
     const [colour, relief] = await Promise.all([g.texture, g.relief].map((p) => readFile(new URL(p, ROOT))));
     assert.deepEqual(webpSize(relief), webpSize(colour), `${g.id}: relief and colour line up`);
@@ -127,7 +118,7 @@ test('redrawn garments have an aligned relief map, a signature and core cells in
 
 test('all garment pictures together stay within 3 MB', async () => {
   const data = await readJson('assets/clothes/garments.json');
-  const paths = data.garments.filter((g) => g.kind !== 'film').flatMap((g) => [g.texture, g.relief].filter(Boolean));
+  const paths = data.garments.flatMap((g) => [g.texture, g.relief].filter(Boolean));
   const sizes = await Promise.all(paths.map(async (p) => (await stat(new URL(p, ROOT))).size));
   const total = sizes.reduce((a, b) => a + b, 0);
   assert.ok(total <= 3 * 2 ** 20, `${(total / 2 ** 20).toFixed(2)} MB`);

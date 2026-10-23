@@ -32,7 +32,6 @@ const FALLBACK = {
   endpaper: 'assets/art/manual-endpaper.svg',
   questionMark: 'assets/placeholders/question-mark.svg',
   desiccant: 'assets/art/desiccant.webp',
-  photo: 'assets/placeholders/photo.svg',
 };
 
 const $ = (id) => document.getElementById(id);
@@ -91,7 +90,6 @@ function createAnnouncer(node) {
 
 function reportPlaceholders(config, resolved, bookView) {
   const pending = Object.keys(FALLBACK).filter((key) => String(resolved[key] ?? '').includes('/placeholders/'));
-  if (!config.photo.alt || config.photo.alt.startsWith('[')) pending.push('photo.alt');
   if (config.text.ownerName.startsWith('[')) pending.push('text.ownerName');
   if (bookView.hasPlaceholders()) pending.push('content/book.md');
   if (pending.length) {
@@ -104,11 +102,9 @@ function imagePlan(config) {
     .filter(([key]) => FALLBACK[key])
     .map(([key, src]) => ({ key, src: src || FALLBACK[key], fallback: FALLBACK[key] }));
   const extras = [
-    { key: 'photo', src: config.photo.src, fallback: FALLBACK.photo },
     { key: 'paper', src: config.textures.paper },
     { key: 'grain', src: config.textures.grain },
   ];
-  if (config.photo.shade) extras.push({ key: 'photoShade', src: config.photo.shade });
   if (config.art.instruction) extras.push({ key: 'instruction', src: config.art.instruction });
   extras.push(...(config.books ?? []).map(({ id, cover }) => ({ key: `book:${id}`, src: cover })));
   return [...art, ...extras];
@@ -182,11 +178,7 @@ function wireClothes(app, flow) {
     })
     : NO_KEYS;
   flow.attachClothes();
-  /** Show or hide the clothes; while they show, the layer draws the pack and the CSS one steps aside. */
-  const showClothes = (on) => {
-    clothes.show(on);
-    app.scene.pack.el.classList.toggle('is-handed-over', clothes.enabled && on);
-  };
+  const showClothes = (on) => clothes.show(on);
   let timer = 0;
   machine.subscribe((to) => {
     clearTimeout(timer);
@@ -305,10 +297,6 @@ async function start() {
   applyArt(scene.parcel, { ...config.art, ...resolved }, { grain: resolved.grain });
   document.documentElement.style.setProperty('--art-book-cover', cssUrl(resolved.bookCover));
   document.documentElement.style.setProperty('--art-endpaper', cssUrl(resolved.endpaper));
-  scene.pack.img.src = resolved.photo;
-  scene.pack.img.alt = config.photo.alt;
-  if (resolved.photoShade) scene.pack.shade.src = resolved.photoShade;
-  else scene.pack.shade.hidden = true;
   scene.questionImg.src = resolved.questionMark;
   scene.desiccant.src = resolved.desiccant;
   (config.books ?? []).forEach(({ id, alt }) => {
@@ -337,7 +325,7 @@ async function start() {
     sound: () => sound.status(),
     book: () => bookView.status(),
     clothes: () => ({ ...app.clothes.status(), reachable: flow.bookReachable() }),
-    /** The id of the body (a garment or the pack) on top at screen point (x, y), or null. */
+    /** The id of the garment on top at screen point (x, y), or null. */
     pick: (x, y) => {
       const hit = app.clothes.pickAt(x, y);
       return hit ? app.clothes.bodies[hit.garment].id : null;

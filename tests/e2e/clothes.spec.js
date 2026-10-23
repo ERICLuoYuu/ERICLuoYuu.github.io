@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { openSite, stateOf, waitForState, touchDrag } from './helpers.js';
 import {
-  clothesOf, waitForSettled, pointOn, dragMouse, clearWithKeyboard, tabToBooklet, gridOver, filmPoints, pixelAt,
+  clothesOf, waitForSettled, pointOn, dragMouse, clearWithKeyboard, tabToBooklet,
 } from './clothes-helpers.js';
 
 const shownKeys = (page) => page.locator('.clothes-key:not([hidden])');
@@ -16,86 +16,6 @@ const distance = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 test.describe('clothes in the box (desktop)', () => {
   test.skip(({ isMobile }) => isMobile, 'mouse and keyboard');
 
-  test('the pack can be picked up anywhere, clear film included, and moved', async ({ page }) => {
-    await openSite(page, '?jump=overhead');
-    await waitForState(page, 'overhead');
-    // The film point nearest the middle: pulled by a corner, a heavy sheet mostly swings round rather than slides
-    const box = await page.evaluate(() => window.__parcel.garmentBox('pack'));
-    const middle = [box.left + box.width / 2, box.top + box.height / 2];
-    const [film] = (await filmPoints(page, await gridOver(page, 'pack')))
-      .sort((a, b) => Math.hypot(a.x - middle[0], a.y - middle[1]) - Math.hypot(b.x - middle[0], b.y - middle[1]));
-    expect(film, 'a point over clear film').toBeDefined();
-    expect(await page.evaluate(([x, y]) => window.__parcel.pick(x, y), [film.x, film.y])).toBe('pack');
-    const before = await centreOf(page, 'pack');
-    await dragMouse(page, film, { x: film.x + 40, y: film.y });
-    await waitForSettled(page);
-    expect((await centreOf(page, 'pack'))[0] - before[0]).toBeGreaterThan(10);
-  });
-
-  test('while the clothes show, the drawn pack stands in for the CSS one; restart puts it back', async ({ page }) => {
-    await openSite(page, '?jump=overhead');
-    await waitForState(page, 'overhead');
-    const opacity = () => page.$eval('.pack', (el) => getComputedStyle(el).opacity);
-    expect(await opacity()).toBe('0');
-    expect(await page.$eval('.pack-img', (img) => img.alt), 'screen readers still hear it').not.toBe('');
-    const home = await centreOf(page, 'pack');
-    const grip = await pointOn(page, 'pack');
-    await dragMouse(page, grip, { x: grip.x + 40, y: grip.y });
-    await waitForSettled(page);
-    await page.click('#restart');
-    await waitForState(page, 'sealed');
-    expect(await opacity()).toBe('1');
-    expect(await centreOf(page, 'pack')).toEqual(home);
-  });
-
-  test("the pack's clear film is drawn see-through and pale, not cut away", async ({ page }) => {
-    await openSite(page, '?jump=overhead');
-    await waitForState(page, 'overhead');
-    const [film] = await filmPoints(page, await gridOver(page, 'pack'));
-    expect(film, 'a point over clear film').toBeDefined();
-    const [r, g, b, a] = await pixelAt(page, film.x, film.y);
-    expect(a, 'partly see-through').toBeGreaterThan(0.25 * 255);
-    expect(a, 'partly see-through').toBeLessThan(0.85 * 255);
-    expect((r + g + b) / 3 / a, 'pale film, not a shadow').toBeGreaterThan(0.5);
-  });
-
-  test('cloth beneath the pack shows through its clear film', async ({ page }) => {
-    await openSite(page, '?jump=overhead');
-    await waitForState(page, 'overhead');
-    const box = await page.$eval('.book-top', (el) => el.getBoundingClientRect().toJSON());
-    const over = [];
-    for (let j = 1; j < 14; j += 1) {
-      for (let i = 1; i < 14; i += 1) over.push({ x: box.left + (box.width * i) / 14, y: box.top + (box.height * j) / 14 });
-    }
-    const pile = await page.evaluate((points) => points
-      .filter(({ x, y }) => window.__parcel.pick(x, y))
-      .map((p) => ({ ...p, colour: window.__parcel.pixel(p.x, p.y) })), over);
-
-    // The same pile with the pack lifted over it; everything lies asleep, so nothing moves.
-    await page.route('**/assets/clothes/pile.json', async (route) => {
-      const json = await (await route.fetch()).json();
-      const pack = json.garments.find((g) => g.id === 'pack');
-      pack.positions = pack.positions.map((v, i) => v + [200, 0, 70][i % 3]);
-      await route.fulfill({ json });
-    });
-    await page.goto('/?jump=overhead');
-    await waitForState(page, 'overhead');
-    const under = await filmPoints(page, pile);
-    const shown = await page.evaluate((points) => points.map((p) => ({ ...p, after: window.__parcel.pixel(p.x, p.y) })), under);
-    expect(shown.length, 'points where clear film lies over the pile').toBeGreaterThanOrEqual(6);
-    shown.forEach((p) => expect(p.after, `the film is drawn at (${p.x}, ${p.y})`).not.toEqual(p.colour));
-    // The lifted pack's contents shade some of the pile beneath: compare the lightest third with the darkest
-    // third, not single points, so one point in that shadow does not decide it.
-    const luma = ([r, g, b]) => 0.3 * r + 0.59 * g + 0.11 * b;
-    const mean = (points, key) => points.reduce((sum, p) => sum + luma(p[key]), 0) / points.length;
-    const sorted = [...shown].sort((p, q) => luma(q.colour) - luma(p.colour));
-    const third = Math.floor(sorted.length / 3);
-    const [light, dark] = [sorted.slice(0, third), sorted.slice(-third)];
-    const contrast = mean(light, 'colour') - mean(dark, 'colour');
-    expect(contrast, 'the film lies over garments of different shades').toBeGreaterThan(40);
-    expect(mean(light, 'after') - mean(dark, 'after'), 'they still differ through the film').toBeGreaterThan(0.3 * contrast);
-  });
-
   test('a garment whose relief is missing is still drawn, and the clothes still work', async ({ page }) => {
     await page.route('**/assets/clothes/qipao-relief.webp', (route) => route.fulfill({ status: 404, body: '' }));
     const warnings = [];
@@ -105,14 +25,6 @@ test.describe('clothes in the box (desktop)', () => {
     expect((await clothesOf(page)).enabled).toBe(true);
     expect(warnings.join('\n')).toContain('qipao-relief.webp');
     expect(await page.evaluate(() => window.__parcel.garmentBox('qipao'))).not.toBeNull();
-  });
-
-  test('the keyboard offers to move the garments, never the pack', async ({ page }) => {
-    await openSite(page, '?jump=overhead');
-    await waitForState(page, 'overhead');
-    const labels = await page.$$eval('#clothes-controls button', (buttons) => buttons.map((b) => b.getAttribute('aria-label')));
-    expect(labels).toHaveLength(8);
-    labels.forEach((label) => expect(label).not.toMatch(/pack/i));
   });
 
   test('the open hand shows exactly where cloth is visible, never over a transparent margin', async ({ page }) => {
@@ -273,7 +185,7 @@ test.describe('clothes in the box (desktop)', () => {
     const inBox = ([x, y]) => x > 0 && x < 420 && y > 0 && y < 300;
     const { garments } = await clothesOf(page);
     expect(inBox(garments.find((g) => g.id === point.id).centre)).toBe(false);
-    await expect(shownKeys(page)).toHaveCount(garments.filter((g) => g.id !== 'pack' && inBox(g.centre)).length);
+    await expect(shownKeys(page)).toHaveCount(garments.filter((g) => inBox(g.centre)).length);
   });
 
   test('losing the graphics mid-move does not jam the keyboard moves', async ({ page }) => {
@@ -324,19 +236,6 @@ test.describe('clothes in the box (desktop)', () => {
 
 test.describe('without WebGL', () => {
   test.skip(({ isMobile }) => isMobile, 'desktop');
-
-  test('the CSS pack stays, flat, as the fallback', async ({ page }) => {
-    await page.addInitScript(() => {
-      const original = HTMLCanvasElement.prototype.getContext;
-      HTMLCanvasElement.prototype.getContext = function getContext(type, ...rest) {
-        return type === 'webgl2' ? null : original.call(this, type, ...rest);
-      };
-    });
-    await openSite(page, '?jump=overhead');
-    await waitForState(page, 'overhead');
-    await expect(page.locator('.pack')).toBeVisible();
-    await expect(page.locator('.pack-edge')).toHaveCount(0);
-  });
 
   test('the clothes are skipped and the booklet opens straight after the reveal', async ({ page }) => {
     await page.addInitScript(() => {

@@ -75,7 +75,7 @@ function floorItemCollider(name, { x, y, width, height, thickness, rotate }, bas
   return obb(name, centre, axes, [width / 2, height / 2, thickness / 2]);
 }
 
-/** Oriented boxes for the walls, the open flaps, the booklet, the desiccant and the books (the pack is cloth: js/cloth). */
+/** Oriented boxes for the walls, the open flaps, the booklet, the desiccant and the books. */
 export function boxColliders() {
   const sides = Object.keys(SIDES);
   return [

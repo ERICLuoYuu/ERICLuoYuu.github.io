@@ -178,24 +178,6 @@ body[data-state="dark"] .floor-glow { opacity: 1; }
 /* ─── contents ─────────────────────────────────────────────────────────── */
 .contents { position: absolute; inset: 0; transform-style: preserve-3d; }
 
-/* The owner's vacuum pack, lying flat along the left wall. */
-.pack {
-  position: absolute;
-  transform-style: preserve-3d;
-  transform: rotate(var(--rot));
-  pointer-events: none;
-}
-.pack-body {
-  position: absolute; inset: 0;
-  transform: translateZ(var(--thick));
-  /* Falls away from the light (+x, +y) like the cloth's shadows. The image's own
-     alpha shapes it: the clear film casts a faint shadow, the contents a firm one. */
-  filter: drop-shadow(2px 3px 2.5px rgba(30, 18, 8, .42)) brightness(calc(1 - (1 - var(--light, 1)) * .95));
-}
-.pack-img, .pack-shade { position: absolute; inset: 0; width: 100%; height: 100%; }
-/* With the clothes layer showing, the pack is drawn there, a body visitors can move; the CSS pack is the fallback.
-   Out of sight, not out of the accessibility tree: screen readers still hear photo.alt. */
-.pack.is-handed-over { opacity: 0; }
 .desiccant {
   position: absolute;
   transform: translateZ(calc(var(--base, 0px) + 1.2px)) rotate(var(--rot));

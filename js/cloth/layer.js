@@ -29,7 +29,6 @@ const BOUNDS = { min: [-700, -600, 0], max: [1200, 1000, 700] }; // the table, r
 const CARRY_SPEED = 320; // units a second for a keyboard move...
 const CARRY_TIME = [0.8, 1.6]; // ...taking between these many seconds
 const CLEAR_SHIFT = 700; // clearAside(): far enough right to be off the box
-const FILM_PICK = 0.02; // the pack is picked up wherever there is any film
 const CONTEXT = { alpha: true, premultipliedAlpha: true, antialias: true, depth: true, stencil: false };
 
 const DISABLED = Object.freeze({
@@ -115,10 +114,6 @@ async function loadAssets() {
   if (pile.garments.length !== ids.length || pile.garments.some((g, i) => g.id !== ids[i])) {
     throw new Error('pile.json does not list the garments of garments.json; run npm run clothes');
   }
-  const kinds = data.garments.map((g) => g.kind ?? 'garment');
-  if (kinds.indexOf('film') >= 0 && kinds.slice(kinds.indexOf('film')).some((k) => k !== 'film')) {
-    throw new Error('garments.json: the film body (the pack) must come after the garments');
-  }
   const meshes = data.garments.map(buildMesh);
   pile.garments.forEach((g, i) => {
     if (g.positions.length !== 3 * meshes[i].count) throw new Error(`pile.json: ${g.id} has the wrong number of positions`);
@@ -162,9 +157,8 @@ function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
     thickness: pile.thickness,
   });
   const alphaAt = images.map(alphaSampler);
-  const isFilm = data.garments.map((g) => g.kind === 'film');
-  // Garments are picked where their picture is mostly opaque; the pack's clear film wherever there is any.
-  const pickable = (g, u, v) => (isFilm[g] ? Number(alphaAt[g](u, v) > FILM_PICK) : alphaAt[g](u, v));
+  // Garments are picked where their picture is mostly opaque.
+  const pickable = (g, u, v) => alphaAt[g](u, v);
   // Upload only the resolution this screen can show (picking keeps the full-size alpha).
   const need = floorPixelsPerUnit(innerWidth, innerHeight, Math.min(devicePixelRatio || 1, 2));
   const looks = data.garments.map((g, i) => {
@@ -175,7 +169,6 @@ function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
       reliefTexel: reliefs[i] ? [1 / reliefs[i].naturalWidth, 1 / reliefs[i].naturalHeight] : [0, 0],
       sheen: g.material.sheen ?? 0.3,
       bump: g.material.bump ?? 0,
-      film: isFilm[i],
     };
   });
   const makeRenderer = () => createRenderer(gl, { meshes, looks, occluders: occluderQuads() });
@@ -193,9 +186,7 @@ function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
   let cost = 0; // smoothed milliseconds per step
 
   const viewport = () => ({ width: canvas.clientWidth || innerWidth, height: canvas.clientHeight || innerHeight });
-  const hand = createHand({
-    world, colliders, ray: (sx, sy) => screenRay(camera.frame(), viewport(), sx, sy), holds: data.garments.map((g) => g.hold),
-  });
+  const hand = createHand({ world, colliders, ray: (sx, sy) => screenRay(camera.frame(), viewport(), sx, sy) });
   const active = () => world.grip !== null || !isSettled(world);
 
   function schedule() {
@@ -320,7 +311,7 @@ function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
   function place(shift) {
     hand.drop();
     pile.garments.forEach(({ positions }, g) => {
-      setPositions(world, g, Float32Array.from(positions, (v, i) => (i % 3 === 0 && !isFilm[g] ? v + shift : v)));
+      setPositions(world, g, Float32Array.from(positions, (v, i) => (i % 3 === 0 ? v + shift : v)));
     });
     sleepAll(world);
     all.forEach((g) => stale.add(g));
@@ -354,9 +345,9 @@ function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
 
   return {
     enabled: true,
-    garments: Object.freeze(data.garments.filter((_, g) => !isFilm[g]).map(({ id, label }) => Object.freeze({ id, label }))),
-    /** Every body: the garments, then the pack. */
-    bodies: Object.freeze(data.garments.map(({ id, label, kind = 'garment' }) => Object.freeze({ id, label, kind }))),
+    garments: Object.freeze(data.garments.map(({ id, label }) => Object.freeze({ id, label }))),
+    /** Every body that can be picked up: the garments. */
+    bodies: Object.freeze(data.garments.map(({ id, label }) => Object.freeze({ id, label, kind: 'garment' }))),
 
     /** Show or hide the canvas. Hiding drops anything held. */
     show(on) {
@@ -367,7 +358,7 @@ function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
     },
     /** The packed pile, exactly as it was on arrival. */
     reset: () => place(0),
-    /** Every garment off to the side of the box (previews and tests); the pack stays. */
+    /** Every garment off to the side of the box (previews and tests). */
     clearAside: () => place(CLEAR_SHIFT),
 
     /** The body under screen point (sx, sy), in CSS pixels, or null; its picture's opacity there as `opacity`. */

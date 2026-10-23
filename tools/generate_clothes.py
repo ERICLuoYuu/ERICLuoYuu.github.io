@@ -5,10 +5,10 @@
 Draws each garment flat, as laid on a table, into assets/clothes/<id>.webp
 (colour, transparent around it) and <id>-relief.webp (the height of seams,
 hems, trims and weave, lit at run time), and updates its record in
-assets/clothes/garments.json: size in parcel units (fitted to the figure in the
-owner's pack, clothes/fit.py), the cloth grid, its
-signature feature and how the fabric behaves. Records of garments not drawn
-this time are kept; the owner's pack is appended last, as a film body (pack_body.py). Then run `node tools/build-pile.mjs` to settle the pile.
+assets/clothes/garments.json: size in parcel units (fitted to the owner's
+figure, clothes/fit.py), the cloth grid, its signature feature and how the
+fabric behaves. Records of garments not drawn this time are kept. Then run
+`node tools/build-pile.mjs` to settle the pile.
 
 The traditional pieces are a qipao, a mandarin-collar blouse and a horse-face
 (mamianqun) skirt; the contemporary ones are high-street basics. No brand
@@ -30,7 +30,6 @@ from clothes.canvas import PX, Canvas  # noqa: E402
 from clothes.fit import CELL, fit, grid_shape  # noqa: E402
 from clothes.modern import floral_skirt, ruched_top, slip_skirt, tee_breton, tee_white  # noqa: E402
 from clothes.traditional import blouse, mamianqun, qipao  # noqa: E402
-from pack_body import pack_record  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "assets" / "clothes"
@@ -101,11 +100,10 @@ def main(argv: list[str] | None = None) -> int:
     data_path = OUT / "garments.json"
     old = json.loads(data_path.read_text(encoding="utf-8")) if data_path.exists() else {"garments": []}
     fresh = [draw(g) for g in GARMENTS if not only or g.id in only]
-    garments = merge(old["garments"], fresh, old.get("pxPerUnit", PX)) + [pack_record(ROOT)]  # the pack, always last
+    garments = merge(old["garments"], fresh, old.get("pxPerUnit", PX))
     data = {"spacing": CELL, "pxPerUnit": PX, "garments": garments}
     data_path.write_text(json.dumps(data, indent=1) + "\n", encoding="utf-8", newline="\n")
-    pictures = [r for r in data["garments"] if r.get("kind") != "film"]  # the pack's pictures are the owner's artwork
-    total = sum((ROOT / r[k]).stat().st_size for r in pictures for k in ("texture", "relief") if r.get(k))
+    total = sum((ROOT / r[k]).stat().st_size for r in data["garments"] for k in ("texture", "relief") if r.get(k))
     print(f"garment pictures: {total / 2**20:.2f} MB of {BUDGET / 2**20:.0f} MB")
     return 0 if total <= BUDGET else 1
 

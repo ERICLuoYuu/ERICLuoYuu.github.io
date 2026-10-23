@@ -113,13 +113,5 @@ export async function gridOver(page, id, n = 16) {
   return points;
 }
 
-/** Those of `points` where the pack's clear film is on top all around (its picture 0.3–0.6 opaque within 5 px). */
-export async function filmPoints(page, points) {
-  return page.evaluate((all) => all.filter(({ x, y }) => [[0, 0], [-5, -5], [5, -5], [-5, 5], [5, 5]].every(([dx, dy]) => {
-    const hit = window.__parcel.hit(x + dx, y + dy);
-    return hit?.id === 'pack' && hit.opacity > 0.3 && hit.opacity < 0.6;
-  })), points);
-}
-
 /** The colour the clothes layer draws at (x, y): [r, g, b, a], premultiplied, 0–255. */
 export const pixelAt = (page, x, y) => page.evaluate(([px, py]) => window.__parcel.pixel(px, py), [x, y]);

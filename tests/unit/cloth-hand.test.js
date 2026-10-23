@@ -1,10 +1,9 @@
 import { test } from 'node:test';
-import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { buildMesh } from '../../js/cloth/mesh.js';
 import { createWorld, setPositions, sleepAll, step, centroid, isSettled } from '../../js/cloth/solver.js';
 import { boxColliders, flapCorners } from '../../js/scene/solids.js';
-import { BOX, CONTENTS } from '../../js/scene/geometry.js';
+import { BOX } from '../../js/scene/geometry.js';
 import { createHand, asideTarget, topParticle, dropAt } from '../../js/cloth/hand.js';
 
 const THICKNESS = 4.5; // the pile's thickness (tools/build-pile.mjs)
@@ -119,7 +118,7 @@ test('a keyboard move takes the garment beyond the nearest wall and lets go', as
   assert.ok(onTable(world), 'on the table');
 });
 
-test('aside means over the gentle right or front flap onto the table — never left over the pack, nor up the steep back flap', () => {
+test('aside means over the gentle right or front flap onto the table — never left over the figurine, nor up the steep back flap', () => {
   const left = scene(40, 150);
   const to = asideTarget(left.world, 0);
   assert.ok(to[0] > BOX.width || to[1] > BOX.depth, `right or front: ${to}`);
@@ -175,72 +174,6 @@ test('cloth carried along on the held garment does not lift the hand ever higher
     frames(world, hand, 1);
   }
   assert.ok(world.grip.to[2] < 80, `the hand rose to ${world.grip.to[2].toFixed(0)}`);
-});
-
-/** The vacuum pack as garments.json describes it, in its place, with a hand that knows its hold. */
-function packScene() {
-  const data = JSON.parse(readFileSync(new URL('../../assets/clothes/garments.json', import.meta.url), 'utf8'));
-  const pack = data.garments.find((g) => g.kind === 'film');
-  if (!pack) throw new Error('garments.json has no pack body yet (npm run clothes)');
-  const mesh = buildMesh(pack);
-  const world = createWorld({
-    garments: [{ mesh, material: pack.material }],
-    colliders: walls(),
-    bounds: { min: [-700, -600, 0], max: [1200, 1000, 700] },
-    thickness: 4.5,
-  });
-  setPositions(world, 0, Float32Array.from(mesh.rest, (v, i) => v + [CONTENTS.pack.x, CONTENTS.pack.y, 2.25][i % 3]));
-  sleepAll(world);
-  return { world, hand: createHand({ world, colliders: walls(), ray, holds: [pack.hold] }) };
-}
-
-/** The particle nearest floor point (x, y). */
-const nearest = (world, x, y) => [...Array(world.count).keys()].reduce((best, i) => (
-  Math.hypot(world.pos[3 * i] - x, world.pos[3 * i + 1] - y) < Math.hypot(world.pos[3 * best] - x, world.pos[3 * best + 1] - y) ? i : best), 0);
-
-test('the pack is held by a wide patch, lifted only a little', () => {
-  const { world, hand } = packScene();
-  const i = nearest(world, 96, 150);
-  const point = [...world.pos.slice(3 * i, 3 * i + 3)];
-  hand.grab(hitAt(world, i), point[0], point[1]);
-  const within = [...Array(world.count).keys()]
-    .filter((j) => Math.hypot(world.pos[3 * j] - point[0], world.pos[3 * j + 1] - point[1]) <= 30);
-  assert.equal(world.grip.ids.length, within.length);
-  assert.ok(Math.abs(world.grip.to[2] - (point[2] + 6)) < 0.01, `held at ${world.grip.to[2]}`);
-});
-
-test('grabbed by its edge beside the wall, the pack is still lifted only a little', () => {
-  const { world, hand } = packScene();
-  const i = nearest(world, CONTENTS.pack.x, 150); // its left edge lies 4 units from the left wall
-  const point = [...world.pos.slice(3 * i, 3 * i + 3)];
-  hand.grab(hitAt(world, i), point[0], point[1]);
-  assert.ok(Math.abs(world.grip.to[2] - (point[2] + 6)) < 0.01, `held at ${world.grip.to[2]}`);
-});
-
-test('pulled onto the wall, the pack is lifted over the rim', () => {
-  const { world, hand } = packScene();
-  const i = nearest(world, CONTENTS.pack.x, 150);
-  hand.grab(hitAt(world, i), world.pos[3 * i], world.pos[3 * i + 1]);
-  hand.dragTo(1, 150);
-  assert.ok(world.grip.to[2] >= BOX.height + 6, `hand at ${world.grip.to[2]}`);
-});
-
-test('dragged by its middle, the pack flexes but keeps its shape', () => {
-  const { world, hand } = packScene();
-  const i = nearest(world, 96, 150);
-  const [x, y] = [world.pos[3 * i], world.pos[3 * i + 1]];
-  hand.grab(hitAt(world, i), x, y);
-  for (let f = 1; f <= 40; f += 1) {
-    hand.dragTo(x + f, y);
-    frames(world, hand, 1);
-  }
-  frames(world, hand, 20);
-  const span = (k) => {
-    const v = [...Array(world.count).keys()].map((j) => world.pos[3 * j + k]);
-    return Math.max(...v) - Math.min(...v);
-  };
-  assert.ok(span(0) >= 0.9 * 181 && span(1) >= 0.9 * 290, `the pack spans ${span(0).toFixed(0)} × ${span(1).toFixed(0)}`);
-  assert.ok(span(2) <= 12, `it rises ${span(2).toFixed(1)} at most: flexing, not folding`);
 });
 
 test('the hand holds a fingertip-sized patch: the grab point and its four nearest neighbours', () => {
@@ -299,21 +232,3 @@ test('carried off the pile onto bare floor, the hand sinks back to just clear of
   // resting on the floor a particle lies THICKNESS / 2 up; the hand holds it 12 above that, not 12 above where it was picked up
   assert.ok(world.grip.to[2] < THICKNESS / 2 + 12 + 1, `held at ${world.grip.to[2].toFixed(1)} over the floor`);
 });
-
-for (const [wall, from, to] of [['left', [25, 150], [8, 150]], ['back', [96, 20], [96, 6]]]) {
-  test(`dragged towards the ${wall} wall and let go, the pack stays inside the box`, () => {
-    const { world, hand } = packScene();
-    const i = nearest(world, ...from);
-    hand.grab(hitAt(world, i), world.pos[3 * i], world.pos[3 * i + 1]);
-    for (let f = 1; f <= 30; f += 1) {
-      hand.dragTo(from[0] + ((to[0] - from[0]) * f) / 30, from[1] + ((to[1] - from[1]) * f) / 30);
-      frames(world, hand, 1);
-    }
-    hand.release();
-    frames(world, hand, 240);
-    const [xs, ys] = [0, 1].map((k) => [...Array(world.count).keys()].map((j) => world.pos[3 * j + k]));
-    // the walls' inner faces are 2 units in
-    assert.ok(Math.min(...xs) > 2 && Math.max(...xs) < BOX.width - 2, `x from ${Math.min(...xs).toFixed(1)} to ${Math.max(...xs).toFixed(1)}`);
-    assert.ok(Math.min(...ys) > 2 && Math.max(...ys) < BOX.depth - 2, `y from ${Math.min(...ys).toFixed(1)} to ${Math.max(...ys).toFixed(1)}`);
-  });
-}

@@ -17,8 +17,6 @@ export const BOX = Object.freeze({
 
 /** Things lying on the floor of the box, in floor coordinates. */
 export const CONTENTS = Object.freeze({
-  // The owner's vacuum pack, flat along the left wall, the full depth of the box.
-  pack: Object.freeze({ x: 6, y: 5, width: 181, height: 290, thickness: 4, rotate: 0 }),
   // The booklet, upper right, where the clothes pile hides it.
   book: Object.freeze({ x: 252, y: 11, width: 96, height: 134, thickness: 8, rotate: 4 }),
   // The silica-gel packet, tucked into the front-right corner.

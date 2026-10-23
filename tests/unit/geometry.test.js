@@ -91,23 +91,12 @@ const overlaps = (p, q) => {
   }));
 };
 
-test('pack, booklet and desiccant lie inside the walls without overlapping', () => {
+test('the booklet and the desiccant lie inside the walls', () => {
   const inner = { left: 2, right: BOX.width - 2, top: 2, bottom: BOX.depth - 2 };
-  const [pack, book, desiccant] = ['pack', 'book', 'desiccant'].map((k) => footprint(CONTENTS[k]));
-  [pack, book, desiccant].forEach((b) => {
+  ['book', 'desiccant'].map((k) => footprint(CONTENTS[k])).forEach((b) => {
     assert.ok(b.left >= inner.left && b.right <= inner.right, 'inside the side walls');
     assert.ok(b.top >= inner.top && b.bottom <= inner.bottom, 'inside the front and back walls');
   });
-  assert.ok(pack.right < book.left && pack.right < desiccant.left, 'the pack stays clear of the rest');
-});
-
-test('the pack lies square along the left wall, the full depth of the box', () => {
-  const { x, y, width, height, rotate } = CONTENTS.pack;
-  assert.equal(rotate, 0);
-  assert.ok(x - 2 <= 6, `${x - 2} units from the left wall`);
-  assert.ok(y >= 2 && y + height <= BOX.depth - 2, 'between the back and front walls');
-  assert.ok(height >= 0.95 * (BOX.depth - 4), `${height} of ${BOX.depth - 4} units deep`);
-  assert.ok(Math.abs(width / height - 747 / 1200) < 0.01, 'the picture keeps its proportions (747 × 1200)');
 });
 
 test('the booklet lies in the upper right, where the pile goes', () => {
@@ -121,7 +110,7 @@ test('the books lie in the lower-right quarter, on the floor or on another book'
     const f = footprint(b);
     assert.ok(f.left >= 195 && f.right <= BOX.width - 2 && f.top >= 158 && f.bottom <= BOX.depth - 2, `${b.id} in the lower right`);
   });
-  const onFloor = [{ ...CONTENTS.book, id: 'booklet' }, { ...CONTENTS.pack, id: 'pack' }, ...BOOKS.filter((b) => !b.on)];
+  const onFloor = [{ ...CONTENTS.book, id: 'booklet' }, ...BOOKS.filter((b) => !b.on)];
   onFloor.forEach((a, i) => onFloor.slice(i + 1).forEach((b) => assert.ok(!overlaps(a, b), `${a.id} and ${b.id} overlap`)));
 });
 
@@ -144,6 +133,6 @@ test('the desiccant packet lies small, on the floor, in the front-right corner',
   assert.equal(baseOf(packet), 0, 'on the floor');
   assert.ok(packet.width <= 26 && packet.height <= 36, 'about the size of a real packet beside the books');
   assert.ok(f.right >= BOX.width - 10 && f.bottom >= BOX.depth - 10, 'tucked into the corner');
-  [...BOOKS, { ...CONTENTS.book, id: 'booklet' }, { ...CONTENTS.pack, id: 'pack' }]
+  [...BOOKS, { ...CONTENTS.book, id: 'booklet' }]
     .forEach((b) => assert.ok(!overlaps(packet, b), `clear of ${b.id}`));
 });

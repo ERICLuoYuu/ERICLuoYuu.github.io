@@ -62,19 +62,6 @@ function buildFlap(side) {
   return { flap, tapeSvg };
 }
 
-/** The owner's vacuum pack, lying flat along the left wall. */
-function buildPack() {
-  const { x, y, width, height, thickness, rotate } = CONTENTS.pack;
-  const pack = h('div', 'pack');
-  pack.style.cssText = `left:${x}px;top:${y}px;width:${width}px;height:${height}px;--rot:${rotate}deg;--thick:${thickness}px`;
-  const img = h('img', 'pack-img', { alt: '', draggable: 'false' });
-  const shade = h('img', 'pack-shade', { alt: '', draggable: 'false', 'aria-hidden': 'true' });
-  const body = h('div', 'pack-body');
-  body.append(img, shade);
-  pack.append(body);
-  return { el: pack, img, shade };
-}
-
 /** The silica-gel packet: a small static prop the clothes can rest against. */
 function buildDesiccant() {
   const { x, y, width, height, rotate } = CONTENTS.desiccant;
@@ -162,12 +149,11 @@ export function buildParcel(container, { text }) {
   };
   Object.entries(vars).forEach(([k, v]) => parcel.style.setProperty(k, v));
 
-  const pack = buildPack();
   const book = buildBook(text);
   const desiccant = buildDesiccant();
   const books = Object.fromEntries(BOOKS.map((b) => [b.id, buildTome(b)]));
   const contents = h('div', 'contents');
-  contents.append(pack.el, ...Object.values(books).map((t) => t.el), desiccant, book.el);
+  contents.append(...Object.values(books).map((t) => t.el), desiccant, book.el);
 
   const flaps = {};
   const tapeSvgs = {};
@@ -198,7 +184,7 @@ export function buildParcel(container, { text }) {
   container.append(parcel);
 
   return {
-    parcel, flaps, tapeSvgs, tapeProbes, question, questionImg: glyphImg, book, books, pack, desiccant,
+    parcel, flaps, tapeSvgs, tapeProbes, question, questionImg: glyphImg, book, books, desiccant,
   };
 }
 

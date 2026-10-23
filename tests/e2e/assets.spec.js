@@ -11,43 +11,18 @@ test('essential artwork, fonts and sounds load cleanly', async ({ page }) => {
     return ['--art-box-front', '--art-box-side', '--art-flap-long', '--art-box-floor'].map((v) => style.getPropertyValue(v));
   });
   images.forEach((value) => expect(value).toMatch(/^url\("http/));
-  expect(await page.$eval('.pack-img', (img) => img.complete && img.naturalWidth > 0)).toBe(true);
   expect(await page.$eval('.question-img', (img) => img.complete && img.naturalWidth > 0)).toBe(true);
   expect(problems).toEqual([]);
 });
 
-test('the vacuum pack and the desiccant packet lie on the box floor', async ({ page }) => {
+test('the desiccant packet lies on the box floor', async ({ page }) => {
   const problems = await openSite(page, '?jump=overhead');
   await waitForState(page, 'overhead');
-  const loaded = (selector) => page.$eval(selector, (img) => ({ src: img.currentSrc, ok: img.complete && img.naturalWidth > 0 }));
-  const pack = await loaded('.pack-img');
-  expect(pack.src).toContain('assets/photo/vacuum-pack.webp');
-  expect(pack.ok).toBe(true);
-  expect((await loaded('.pack-shade')).ok).toBe(true);
-  await expect(page.locator('.photo-card')).toHaveCount(0);
-  const packet = await loaded('.desiccant');
+  const packet = await page.$eval('.desiccant', (img) => ({ src: img.currentSrc, ok: img.complete && img.naturalWidth > 0 }));
   expect(packet.src).toContain('assets/art/desiccant.webp');
   expect(packet.ok).toBe(true);
-  // the CSS pack is handed over (transparent) while the clothes show: measure layout boxes
-  const rect = (selector) => page.$eval(selector, (el) => el.getBoundingClientRect().toJSON());
-  const [packBox, bookBox] = await Promise.all([rect('.pack-body'), rect('.book3d')]);
-  expect(packBox.x + packBox.width).toBeLessThan(bookBox.x + 4); // the pack lies to the left of the booklet
+  await expect(page.locator('.photo-card')).toHaveCount(0);
   expect(problems).toEqual([]);
-});
-
-test('without its shade overlay the pack still shows, with no broken image', async ({ page }) => {
-  await page.route('**/content/site.js', async (route) => {
-    const original = await (await route.fetch()).text();
-    const body = original.replace("'assets/photo/vacuum-pack-shade.webp'", "'assets/photo/not-made-yet.webp'");
-    await route.fulfill({ contentType: 'text/javascript', body });
-  });
-  const errors = [];
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  await page.goto('/?jump=overhead');
-  await waitForState(page, 'overhead');
-  await expect(page.locator('.pack-shade')).toBeHidden();
-  expect(await page.$eval('.pack-img', (img) => img.complete && img.naturalWidth > 0)).toBe(true);
-  expect(errors.join('\n')).toContain('not-made-yet.webp');
 });
 
 test('a missing artwork file falls back to the built-in art', async ({ page }) => {

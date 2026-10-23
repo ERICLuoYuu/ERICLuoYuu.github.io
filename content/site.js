@@ -70,13 +70,6 @@ export default {
     instruction: '', // optional: a transparent image of your handwritten instruction
   },
 
-  /** Your picture, as a vacuum-sealed pack on the left of the box floor (tools/prepare_pack.py makes both files). */
-  photo: {
-    src: 'assets/photo/vacuum-pack.webp', // the pack cut out of its white canvas, about 0.62 : 1
-    shade: 'assets/photo/vacuum-pack-shade.webp', // soft light and shade laid over it; '' for none
-    // A plain description of what is visible. Reword it in your own voice, then remove "[Draft — check this]".
-    alt: '[Draft — check this] A collage: a person in a red top and blue floral skirt lies under crinkled clear plastic, as if vacuum-packed, surrounded by sushi, fries, strawberries, a fruit-and-yogurt bowl and dumplings.',
-  },
 
   /** Books you like, lying in the lower right of the box (tools/generate_books.py draws the covers). */
   books: [

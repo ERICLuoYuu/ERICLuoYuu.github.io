@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { openSite, stateOf, bookOf, waitForState, mouseCutAll } from './helpers.js';
-import { clearWithMouse, bareBookletPoint, pointOn } from './clothes-helpers.js';
+import { clearWithMouse, bareBookletPoint } from './clothes-helpers.js';
 
 test.describe('the whole parcel, start to finish', () => {
   test.skip(({ isMobile }) => isMobile, 'desktop journey');
@@ -17,7 +17,6 @@ test.describe('the whole parcel, start to finish', () => {
     await waitForState(page, 'overhead');
     const light = await page.$eval('.parcel', (el) => el.style.getPropertyValue('--light'));
     expect(Number(light)).toBeCloseTo(1, 2);
-    expect(await pointOn(page, 'pack'), 'the pack lies in the box').not.toBeNull();
 
     await clearWithMouse(page);
     const bare = await bareBookletPoint(page);
@@ -104,7 +103,8 @@ test.describe('phone', () => {
     await page.tap('.question');
     await waitForState(page, 'overhead');
     const book = await page.locator('.book-top').boundingBox();
-    expect(book.width).toBeGreaterThan(70); // still comfortable to tap
+    // tilted 14°, the nearer front rim sets the fit, so the floor is a little smaller: 66 px; touch targets want 48
+    expect(book.width).toBeGreaterThan(60); // still comfortable to tap
     expect(book.x).toBeGreaterThan(0);
     expect(book.x + book.width).toBeLessThan(page.viewportSize().width);
   });
