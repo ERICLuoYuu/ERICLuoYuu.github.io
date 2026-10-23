@@ -88,9 +88,13 @@ function createAnnouncer(node) {
   };
 }
 
+const isDraft = (alt) => !alt || alt.startsWith('[');
+
 function reportPlaceholders(config, resolved, bookView) {
   const pending = Object.keys(FALLBACK).filter((key) => String(resolved[key] ?? '').includes('/placeholders/'));
   if (config.text.ownerName.startsWith('[')) pending.push('text.ownerName');
+  if (isDraft(config.figurine?.alt)) pending.push('figurine.alt');
+  (config.food ?? []).filter(({ alt }) => isDraft(alt)).forEach(({ id }) => pending.push(`food.${id}.alt`));
   if (bookView.hasPlaceholders()) pending.push('content/book.md');
   if (pending.length) {
     console.info(`[parcel] Placeholders still in use: ${pending.join(', ')}.\nSee README.md → "Make it yours".`);
@@ -107,8 +111,33 @@ function imagePlan(config) {
   ];
   if (config.art.instruction) extras.push({ key: 'instruction', src: config.art.instruction });
   extras.push(...(config.books ?? []).map(({ id, cover }) => ({ key: `book:${id}`, src: cover })));
+  if (config.figurine) {
+    extras.push({ key: 'solid:figurine', src: config.figurine.src }, { key: 'solid:figurine-wrap', src: config.figurine.wrap });
+  }
+  extras.push(...(config.food ?? []).map(({ id, src }) => ({ key: `solid:${id}`, src })));
   return [...art, ...extras];
 }
+
+/** The still pictures of the figurine and the food: their files and what they show. */
+function applySolids({ figurine, food }, config, resolved) {
+  if (config.figurine) {
+    figurine.img.alt = config.figurine.alt;
+    if (resolved['solid:figurine']) figurine.img.src = resolved['solid:figurine'];
+    if (resolved['solid:figurine-wrap']) figurine.wrap.src = resolved['solid:figurine-wrap'];
+  }
+  (config.food ?? []).forEach(({ id, alt }) => {
+    const item = food[id];
+    if (!item) {
+      console.warn(`[parcel] content/site.js lists a food "${id}" that the box has no place for.`);
+      return;
+    }
+    item.img.alt = alt;
+    if (resolved[`solid:${id}`]) item.img.src = resolved[`solid:${id}`];
+  });
+}
+
+/** The still pictures' elements: while the clothes layer draws the bodies, these step aside. */
+const solidElements = ({ figurine, food }) => [figurine.el, ...Object.values(food).map((f) => f.el)];
 
 function fontsTask() {
   if (!document.fonts?.load) return Promise.resolve();
@@ -178,7 +207,22 @@ function wireClothes(app, flow) {
     })
     : NO_KEYS;
   flow.attachClothes();
-  const showClothes = (on) => clothes.show(on);
+  let shown = false;
+  let lost = false;
+  /** The layer draws the bodies while it shows and has its graphics; otherwise the still pictures do. */
+  const handOver = () => {
+    const on = clothes.rigidEnabled && shown && !lost;
+    solidElements(app.scene.solids).forEach((el) => el.classList.toggle('is-handed-over', on));
+  };
+  clothes.onLost((isLost) => {
+    lost = isLost;
+    handOver();
+  });
+  const showClothes = (on) => {
+    clothes.show(on);
+    shown = on;
+    handOver();
+  };
   let timer = 0;
   machine.subscribe((to) => {
     clearTimeout(timer);
@@ -281,7 +325,9 @@ async function start() {
   });
 
   const progressBar = $('loader-progress');
-  const clothesTask = createClothes({ canvas: $('clothes'), camera, reducedMotion: prefersReducedMotion }); // always resolves
+  const clothesTask = createClothes({ // always resolves
+    canvas: $('clothes'), camera, reducedMotion: prefersReducedMotion, solids: { figurine: config.figurine, food: config.food },
+  });
   resolved = await preload({
     images: imagePlan(config),
     tasks: [
@@ -309,6 +355,7 @@ async function start() {
     if (resolved[`book:${id}`]) tome.cover.src = resolved[`book:${id}`];
     else tome.cover.hidden = true; // the block keeps its board colour
   });
+  applySolids(scene.solids, config, resolved);
   app.resetInstruction();
   reportPlaceholders(config, resolved, bookView);
 
@@ -325,17 +372,19 @@ async function start() {
     sound: () => sound.status(),
     book: () => bookView.status(),
     clothes: () => ({ ...app.clothes.status(), reachable: flow.bookReachable() }),
-    /** The id of the garment on top at screen point (x, y), or null. */
-    pick: (x, y) => {
-      const hit = app.clothes.pickAt(x, y);
-      return hit ? app.clothes.bodies[hit.garment].id : null;
-    },
+    /** The id of the body (a garment, the figurine or a food item) on top at screen point (x, y), or null. */
+    pick: (x, y) => app.clothes.pickAt(x, y)?.id ?? null,
     /** What lies on top at (x, y): its id, the texture point and the picture's opacity there. */
     hit: (x, y) => {
       const hit = app.clothes.pickAt(x, y);
-      return hit ? { id: app.clothes.bodies[hit.garment].id, uv: hit.uv, opacity: hit.opacity } : null;
+      return hit ? { id: hit.id, uv: hit.uv, opacity: hit.opacity } : null;
     },
-    garmentBox: (id) => app.clothes.screenBox(app.clothes.bodies.findIndex((g) => g.id === id)),
+    /** Any body's outline on screen (the name is older than the figurine and the food). */
+    garmentBox: (id) => app.clothes.screenBox(app.clothes.bodies.findIndex((b) => b.id === id)),
+    /** Where a rigid body's top at picture point (u, v) is on screen. */
+    bodyScreen: (id, uv) => app.clothes.bodyScreen(id, uv),
+    /** Every garment off to the side of the box. */
+    clearAside: () => app.clothes.clearAside(),
     project: (point) => app.clothes.project(point),
     pixel: (x, y) => app.clothes.pixelAt(x, y),
   };

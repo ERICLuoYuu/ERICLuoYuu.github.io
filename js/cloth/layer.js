@@ -1,16 +1,19 @@
 /**
  * The clothes layer: a transparent WebGL2 canvas over the CSS-3D parcel, the
- * cloth world behind it, and the loop that steps and draws them — only while
- * something moves or the view changes.
+ * cloth world behind it, the rigid bodies (the figurine and the food) lying
+ * in it, and the loop that moves and draws them — only while something moves
+ * or the view changes.
  *
  * createClothes() always resolves. Without WebGL2, or when the clothes data
  * cannot be loaded, it resolves a disabled layer whose methods do nothing,
- * and the rest of the site carries on as if there were no clothes.
+ * and the rest of the site carries on as if there were no clothes. When only
+ * the bodies' pictures fail, the clothes work and the bodies stay the CSS
+ * pictures (rigidEnabled is false).
  */
 
 import { buildMesh } from './mesh.js';
 import {
-  createWorld, step, isSettled, setPositions, sleepAll, centroid,
+  createWorld, step, isSettled, setPositions, sleepAll, centroid, setColliders,
 } from './solver.js';
 import { pick } from './pick.js';
 import { bookCoverage } from './coverage.js';
@@ -18,8 +21,15 @@ import { createHand, asideTarget, dropAt } from './hand.js';
 import { createRenderer } from './render.js';
 import { floorPixelsPerUnit, textureScale } from './budget.js';
 import { boxColliders, occluderQuads } from '../scene/solids.js';
-import { CONTENTS } from '../scene/geometry.js';
+import { CONTENTS, FIGURINE, FOOD } from '../scene/geometry.js';
 import { cameraMatrix, projectPoint, screenRay } from '../scene/projection.js';
+import { createRigid } from '../rigid/controller.js';
+import { loadSolids } from '../rigid/load.js';
+import { createRigidRenderer, partsFor } from '../rigid/render.js';
+import {
+  createBody, bodyCollider, footprintCorners, fromRect, overlapXY,
+} from '../rigid/body.js';
+import { surfacePoint } from '../rigid/heightfield.js';
 
 const DATA = 'assets/clothes/garments.json';
 const PILE = 'assets/clothes/pile.json';
@@ -30,10 +40,14 @@ const CARRY_SPEED = 320; // units a second for a keyboard move...
 const CARRY_TIME = [0.8, 1.6]; // ...taking between these many seconds
 const CLEAR_SHIFT = 700; // clearAside(): far enough right to be off the box
 const CONTEXT = { alpha: true, premultipliedAlpha: true, antialias: true, depth: true, stencil: false };
+const BODY_PX = 4; // pixels a unit in the figurine's and the food's pictures
+const BOOK = fromRect(CONTENTS.book); // the booklet, as a body, for overBook
 
 const DISABLED = Object.freeze({
   enabled: false,
+  rigidEnabled: false,
   garments: Object.freeze([]),
+  solids: Object.freeze([]),
   bodies: Object.freeze([]),
   show() {},
   reset() {},
@@ -44,9 +58,12 @@ const DISABLED = Object.freeze({
   dragTo() {},
   release() {},
   moveAside: async () => {},
+  moveBodyHome: async () => {},
   screenBox: () => null,
+  bodyScreen: () => null,
   coverage: () => 0,
   onSettle: () => () => {},
+  onLost: () => () => {},
   status: () => ({ enabled: false }),
   project: () => null,
 });
@@ -125,27 +142,48 @@ async function loadAssets() {
   return { data, pile, meshes, images, reliefs };
 }
 
+/** The figurine's and the food's pictures, or null (with a warning) when they cannot be loaded. */
+async function loadBodies(config) {
+  if (!config) return null;
+  try {
+    return await loadSolids(config);
+  } catch (err) {
+    console.warn(`[parcel] The figurine and the food stay still pictures: ${err.message}.`);
+    return null;
+  }
+}
+
 /**
- * @param {{canvas: HTMLCanvasElement, camera: {frame(): object, onChange(fn): Function}}} options
+ * @param {{canvas: HTMLCanvasElement, camera: {frame(): object, onChange(fn): Function},
+ *          reducedMotion?: () => boolean, solids?: {figurine: object, food: object[]}}} options
+ *   solids: content/site.js's figurine and food
  * @returns {Promise<object>} the layer (see the object returned at the end of createLayer)
  */
-export async function createClothes({ canvas, camera, reducedMotion = () => false }) {
+export async function createClothes({
+  canvas, camera, reducedMotion = () => false, solids: solidsConfig = null,
+}) {
   const gl = canvas.getContext('webgl2', CONTEXT);
   if (!gl) return disabled('this browser has no WebGL2.');
+  const bodiesTask = loadBodies(solidsConfig);
   let assets;
   try {
     assets = await loadAssets();
   } catch (err) {
     return disabled(`the clothes could not be loaded (${err.message}).`);
   }
+  const solids = await bodiesTask;
   try {
-    return createLayer({ canvas, gl, camera, assets, reducedMotion });
+    return createLayer({
+      canvas, gl, camera, assets, solids, reducedMotion,
+    });
   } catch (err) {
     return disabled(`the clothes could not be drawn (${err.message}).`);
   }
 }
 
-function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
+function createLayer({
+  canvas, gl, camera, assets, solids, reducedMotion,
+}) {
   const {
     data, pile, meshes, images, reliefs,
   } = assets;
@@ -156,6 +194,14 @@ function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
     bounds: BOUNDS,
     thickness: pile.thickness,
   });
+  const viewport = () => ({ width: canvas.clientWidth || innerWidth, height: canvas.clientHeight || innerHeight });
+  const ray = (sx, sy) => screenRay(camera.frame(), viewport(), sx, sy);
+  const rigid = solids && createRigid({
+    defs: solids.defs, samplers: solids.samplers, world, staticColliders: colliders, ray, viewport,
+  });
+  // still pictures still keep the cloth off them
+  if (!rigid) setColliders(world, [...colliders, ...[FIGURINE, ...FOOD].map((def) => bodyCollider(createBody(def)))]);
+  const garmentCount = data.garments.length;
   const alphaAt = images.map(alphaSampler);
   // Garments are picked where their picture is mostly opaque.
   const pickable = (g, u, v) => alphaAt[g](u, v);
@@ -171,11 +217,20 @@ function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
       bump: g.material.bump ?? 0,
     };
   });
-  const makeRenderer = () => createRenderer(gl, { meshes, looks, occluders: occluderQuads() });
+  const rigidParts = rigid && partsFor(solids, (image) => resized(image, textureScale(BODY_PX, need)));
+  let rigidRenderer = null;
+  const makeRenderer = () => {
+    rigidRenderer = rigidParts ? createRigidRenderer(gl, { parts: rigidParts }) : null;
+    rigidRenderer?.setPlacements(rigid.bodies, rigid.supports);
+    return createRenderer(gl, {
+      meshes, looks, occluders: occluderQuads(), rigid: rigidRenderer,
+    });
+  };
   let renderer = makeRenderer();
   const all = data.garments.map((_, g) => g);
   const stale = new Set(all); // garments whose shape the GPU has not seen yet
   const settleListeners = new Set();
+  const lostListeners = new Set();
   let visible = false;
   let lost = false;
   let dirty = true;
@@ -185,9 +240,9 @@ function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
   let substeps = world.settings.substeps;
   let cost = 0; // smoothed milliseconds per step
 
-  const viewport = () => ({ width: canvas.clientWidth || innerWidth, height: canvas.clientHeight || innerHeight });
-  const hand = createHand({ world, ray: (sx, sy) => screenRay(camera.frame(), viewport(), sx, sy) });
-  const active = () => world.grip !== null || !isSettled(world);
+  const hand = createHand({ world, ray });
+  const clothActive = () => world.grip !== null || !isSettled(world);
+  const active = () => clothActive() || Boolean(rigid?.active());
 
   function schedule() {
     if (!frameId && visible) frameId = requestAnimationFrame(tick);
@@ -241,22 +296,39 @@ function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
     });
   }
 
-  /** One animation frame. Without a graphics context the cloth still moves (a carry still ends); only drawing waits. */
+  /** A body moved: draw it there, and its shadow with it. */
+  function bodiesMoved() {
+    rigidRenderer?.setPlacements(rigid.bodies, rigid.supports);
+    renderer.invalidateShadow();
+    dirty = true;
+  }
+
+  /**
+   * One animation frame: the hands, then the bodies, then the cloth. Without
+   * a graphics context everything still moves (a carry still ends); only
+   * drawing waits.
+   */
   function tick(now) {
     frameId = 0;
     if (active()) {
       const elapsed = last ? Math.min(0.25, (now - last) / 1000) : STEP;
       last = now;
       hand.advance(elapsed);
-      backlog += elapsed;
+      if (rigid?.advance(elapsed)) bodiesMoved();
       let steps = 0;
-      while (backlog >= STEP && steps < MAX_STEPS) {
-        simulate();
-        backlog -= STEP;
-        steps += 1;
+      if (clothActive()) {
+        backlog += elapsed;
+        while (backlog >= STEP && steps < MAX_STEPS) {
+          simulate();
+          backlog -= STEP;
+          steps += 1;
+        }
+        if (backlog >= STEP) backlog = 0; // could not keep up: let the time go
       }
-      if (backlog >= STEP) backlog = 0; // could not keep up: let the time go
-      if (steps > 0) dirty = true;
+      if (steps > 0) {
+        dirty = true;
+        rigid?.disturb(); // what the bodies rest on may have moved
+      }
       if (!active()) {
         last = 0;
         backlog = 0;
@@ -269,20 +341,31 @@ function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
 
   // ─── the hand ────────────────────────────────────────────────────────────
 
+  const holdingBody = () => Boolean(rigid) && rigid.heldId !== null;
+
+  /** Pick up what `hit` (from pickAt) names: a garment or a body, never both at once. */
   function grab(hit) {
     if (!hit) return;
     const { x, y } = projectPoint(camera.frame(), viewport(), hit.point);
-    hand.grab(hit, x, y);
+    if (hit.kind === 'rigid') {
+      hand.drop();
+      rigid.grab(hit, x, y);
+    } else {
+      if (holdingBody()) rigid.drop();
+      hand.grab(hit, x, y);
+    }
     schedule();
   }
 
   function dragTo(sx, sy) {
-    hand.dragTo(sx, sy);
+    if (holdingBody()) rigid.dragTo(sx, sy);
+    else hand.dragTo(sx, sy);
     schedule();
   }
 
   function release() {
     hand.release();
+    if (holdingBody()) rigid.release();
     schedule();
   }
 
@@ -306,6 +389,24 @@ function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
     return moved;
   }
 
+  /**
+   * Carry rigid body `index` (its place in `solids`) back to where it started,
+   * onto whatever lies there now. With reduced motion it is simply put there.
+   * Resolves once it is let go.
+   */
+  function moveBodyHome(index) {
+    if (!rigid) return Promise.resolve();
+    hand.drop();
+    const [x, y] = rigid.bodies[index].position;
+    const [hx, hy] = solids.defs[index].start;
+    const duration = Math.min(CARRY_TIME[1], Math.max(CARRY_TIME[0], Math.hypot(hx - x, hy - y) / CARRY_SPEED));
+    const instant = reducedMotion();
+    const moved = rigid.carryHome(index, { duration, instant });
+    if (instant) bodiesMoved();
+    schedule();
+    return moved;
+  }
+
   // ─── whole-pile changes ──────────────────────────────────────────────────
 
   function place(shift) {
@@ -315,8 +416,42 @@ function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
     });
     sleepAll(world);
     all.forEach((g) => stale.add(g));
+    rigid?.disturb();
     invalidate();
   }
+
+  /** The pile as it arrived, and every body back in its place. */
+  function reset() {
+    place(0);
+    if (rigid) {
+      rigid.reset();
+      bodiesMoved();
+    }
+  }
+
+  /** On-screen box (CSS pixels) around parcel points. */
+  function outline(points) {
+    const frame = camera.frame();
+    const view = viewport();
+    const box = points.reduce((b, point) => {
+      const { x, y } = projectPoint(frame, view, point);
+      return [Math.min(b[0], x), Math.min(b[1], y), Math.max(b[2], x), Math.max(b[3], y)];
+    }, [Infinity, Infinity, -Infinity, -Infinity]);
+    return {
+      left: box[0], top: box[1], width: box[2] - box[0], height: box[3] - box[1],
+    };
+  }
+
+  /** A body's box corners: its footprint at its base and at its top. */
+  function bodyCorners(body) {
+    const [base, top] = [body.position[2], body.position[2] + body.height];
+    return footprintCorners(body, { inset: 0 }).flatMap(([x, y]) => [[x, y, base], [x, y, top]]);
+  }
+
+  const garmentPoints = (g) => Array.from({ length: world.counts[g] }, (_, k) => {
+    const i = world.offsets[g] + k;
+    return world.pos.subarray(3 * i, 3 * i + 3);
+  });
 
   // ─── outside events ──────────────────────────────────────────────────────
 
@@ -330,6 +465,7 @@ function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
   canvas.addEventListener('webglcontextlost', (event) => {
     event.preventDefault(); // ask for it back
     lost = true;
+    lostListeners.forEach((fn) => fn(true));
   });
   canvas.addEventListener('webglcontextrestored', () => {
     try {
@@ -337,35 +473,60 @@ function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
       lost = false;
       all.forEach((g) => stale.add(g));
       invalidate();
+      lostListeners.forEach((fn) => fn(false));
     } catch (err) {
       console.warn('[parcel] The clothes could not be drawn again after the graphics reset:', err);
     }
   });
   resize();
 
+  const solidList = rigid ? solids.defs.map(({ id, label }) => Object.freeze({ id, label })) : [];
   return {
     enabled: true,
+    /** Whether the figurine and the food are drawn here and can be moved (false: they stay CSS pictures). */
+    rigidEnabled: Boolean(rigid),
     garments: Object.freeze(data.garments.map(({ id, label }) => Object.freeze({ id, label }))),
-    /** Every body that can be picked up: the garments. */
-    bodies: Object.freeze(data.garments.map(({ id, label }) => Object.freeze({ id, label, kind: 'garment' }))),
+    solids: Object.freeze(solidList),
+    /** Every body that can be picked up: the garments, then the figurine and the food. */
+    bodies: Object.freeze([
+      ...data.garments.map(({ id, label }) => Object.freeze({ id, label, kind: 'garment' })),
+      ...solidList.map(({ id, label }) => Object.freeze({ id, label, kind: id === FIGURINE.id ? 'figurine' : 'food' })),
+    ]),
 
     /** Show or hide the canvas. Hiding drops anything held. */
     show(on) {
       visible = Boolean(on);
       canvas.classList.toggle('is-visible', visible);
-      if (!visible) hand.drop();
+      if (!visible) {
+        hand.drop();
+        if (holdingBody()) rigid.drop();
+      }
       if (visible) resize();
     },
-    /** The packed pile, exactly as it was on arrival. */
-    reset: () => place(0),
+    /** The packed pile and the bodies, exactly as they were on arrival. */
+    reset,
     /** Every garment off to the side of the box (previews and tests). */
     clearAside: () => place(CLEAR_SHIFT),
 
-    /** The body under screen point (sx, sy), in CSS pixels, or null; its picture's opacity there as `opacity`. */
+    /**
+     * What lies on top at screen point (sx, sy), in CSS pixels, or null:
+     * {kind: 'cloth'|'rigid', index (in garments or solids), id, point, t, uv,
+     * opacity (its picture's there)}.
+     */
     pickAt(sx, sy) {
       if (!visible) return null;
-      const hit = pick(world, meshes, screenRay(camera.frame(), viewport(), sx, sy), pickable);
-      return hit && { ...hit, opacity: alphaAt[hit.garment](hit.uv[0], hit.uv[1]) };
+      const sight = ray(sx, sy);
+      const found = pick(world, meshes, sight, pickable);
+      const cloth = found && {
+        ...found,
+        kind: 'cloth',
+        index: found.garment,
+        id: data.garments[found.garment].id,
+        opacity: alphaAt[found.garment](found.uv[0], found.uv[1]),
+      };
+      const body = rigid?.pick(sight) ?? null;
+      if (!cloth || !body) return cloth || body;
+      return body.t < cloth.t ? body : cloth;
     },
     /** The colour drawn at screen point (sx, sy) in CSS pixels: [r, g, b, a], premultiplied, 0–255 (tests). */
     pixelAt(sx, sy) {
@@ -380,23 +541,20 @@ function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
     dragTo,
     release,
     moveAside,
+    moveBodyHome,
 
-    /** Garment g's outline on screen as a box in CSS pixels. */
-    screenBox(g) {
-      const frame = camera.frame();
-      const view = viewport();
-      let left = Infinity;
-      let top = Infinity;
-      let right = -Infinity;
-      let bottom = -Infinity;
-      for (let i = world.offsets[g]; i < world.offsets[g] + world.counts[g]; i += 1) {
-        const { x, y } = projectPoint(frame, view, world.pos.subarray(3 * i, 3 * i + 3));
-        left = Math.min(left, x);
-        top = Math.min(top, y);
-        right = Math.max(right, x);
-        bottom = Math.max(bottom, y);
-      }
-      return { left, top, width: right - left, height: bottom - top };
+    /** Body i's outline on screen as a box in CSS pixels (i indexes `bodies`). */
+    screenBox(i) {
+      if (i < 0) return null;
+      if (i < garmentCount) return outline(garmentPoints(i));
+      const body = rigid?.bodies[i - garmentCount];
+      return body ? outline(bodyCorners(body)) : null;
+    },
+    /** Where the top of rigid body `id` at picture point (u, v) is on screen (CSS pixels), or null. */
+    bodyScreen(id, uv) {
+      const index = rigid ? rigid.bodies.findIndex((b) => b.id === id) : -1;
+      if (index < 0) return null;
+      return projectPoint(camera.frame(), viewport(), surfacePoint(rigid.bodies[index], solids.samplers[index].relief, uv));
     },
     /** Share of the booklet's cover under cloth, 0…1. */
     coverage: () => bookCoverage(world, CONTENTS.book),
@@ -404,6 +562,11 @@ function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
     onSettle(fn) {
       settleListeners.add(fn);
       return () => settleListeners.delete(fn);
+    },
+    /** Call fn(true) when the graphics context is lost and fn(false) once it is back; returns an unsubscribe function. */
+    onLost(fn) {
+      lostListeners.add(fn);
+      return () => lostListeners.delete(fn);
     },
     status: () => ({
       enabled: true,
@@ -415,6 +578,8 @@ function createLayer({ canvas, gl, camera, assets, reducedMotion }) {
       substeps,
       coverage: bookCoverage(world, CONTENTS.book),
       garments: data.garments.map(({ id }, g) => ({ id, awake: world.awake[g] === 1, centre: centroid(world, g).map(Math.round) })),
+      rigid: rigid ? rigid.status().map((s, i) => ({ ...s, overBook: overlapXY(rigid.bodies[i], BOOK) })) : [],
+      heldBody: hand.garment !== null ? data.garments[hand.garment].id : (rigid?.heldId ?? null),
     }),
     /** Screen position of a parcel point (CSS pixels). */
     project: (point) => projectPoint(camera.frame(), viewport(), point),

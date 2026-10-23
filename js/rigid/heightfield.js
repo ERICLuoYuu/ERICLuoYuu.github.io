@@ -63,6 +63,13 @@ export function modelMatrix({ position: [x, y, z], rotate }) {
   return Float32Array.from([c, s, 0, 0, -s, c, 0, 0, 0, 0, 1, 0, x, y, z, 1]);
 }
 
+/** The parcel point on the body's top at picture coordinates (u, v): the point picking finds there. */
+export function surfacePoint(body, relief, [u, v]) {
+  const [w, d] = body.footprint;
+  const [x, y] = rotateZ([(u - 0.5) * w, (v - 0.5) * d, 0], body.rotate);
+  return [body.position[0] + x, body.position[1] + y, body.position[2] + body.height * relief(u, v)];
+}
+
 /** A parcel point in the body's picture coordinates (u, v) and its height above the base, or null off the footprint. */
 function onBody(body, [px, py, pz]) {
   const [w, d] = body.footprint;

@@ -296,6 +296,24 @@ body[data-state="dark"] .floor-glow { opacity: 1; }
 .tome[data-book="solitude"] { --board: #d9a23a; }
 .tome[data-book="siddhartha"] { --board: #2f5d62; }
 
+/* The figurine (in its bag) and the food as still pictures, lying at their tops (parcel.js buildSolids). */
+.solid {
+  position: absolute;
+  transform-style: preserve-3d;
+  transform: rotate(var(--rot));
+  pointer-events: none;
+}
+.solid-img, .solid-wrap {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  transform: translateZ(var(--lift));
+}
+/* the shadow falls along the light, as far as the body is tall; everything darkens until the light comes on */
+.solid-img { filter: drop-shadow(var(--sx) var(--sy) var(--sblur) rgba(30, 18, 8, .42)) brightness(calc(1 - (1 - var(--light, 1)) * .95)); }
+.solid-wrap { transform: translateZ(calc(var(--lift) + 2px)); filter: brightness(calc(1 - (1 - var(--light, 1)) * .95)); }
+/* With the clothes layer showing, the bodies are drawn there and can be moved; these pictures are the fallback.
+   Out of sight, not out of the accessibility tree: screen readers still hear their alt text. */
+.solid.is-handed-over { opacity: 0; }
+
 /* The booklet only lifts once the clothes are off it (.is-reachable, set by flow.js). */
 body[data-state="overhead"] .stage:not(.over-garment):not(.is-grabbing) .book3d.is-reachable:hover,
 body[data-state="overhead"] .book3d.is-reachable:focus-within { --lift: 14px; }

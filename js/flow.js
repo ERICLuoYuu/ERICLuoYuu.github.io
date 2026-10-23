@@ -106,10 +106,10 @@ export function createFlow(app) {
     if (!ran) return;
     arrive();
     if (hasClothes()) {
-      announce('Looking down into the box: a vacuum-sealed pack, a pile of clothes, some books, and something underneath.');
+      announce('Looking down into the box: a figurine in a plastic bag, some food, a pile of clothes, some books, and something underneath.');
       focusIfKeyboard(reachable ? scene.book.button : app.clothesKeys.first());
     } else {
-      announce('Looking down into the box: a vacuum-sealed pack, a few books and a little booklet.');
+      announce('Looking down into the box: a figurine in a plastic bag, some food, a few books and a little booklet.');
       focusIfKeyboard(scene.book.button);
     }
   }

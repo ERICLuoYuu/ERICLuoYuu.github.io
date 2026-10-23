@@ -79,6 +79,24 @@ export default {
     { id: 'siddhartha', cover: 'assets/books/siddhartha.webp', alt: 'Siddhartha, by Hermann Hesse' },
   ],
 
+  /** You as a small painted figurine in a clear bag, along the left wall (tools/prepare_figurine.py makes these files). */
+  figurine: {
+    src: 'assets/figurine/figurine.webp',
+    relief: 'assets/figurine/figurine-relief.webp',
+    wrap: 'assets/figurine/wrap.webp',
+    wrapRelief: 'assets/figurine/wrap-relief.webp',
+    // A plain description of what is visible. Reword it in your own voice, then remove "[Draft — check this]".
+    alt: '[Draft — check this] A small painted figure of a person in a red top and blue floral skirt, leaning back on their hands, sealed in a crinkled clear plastic bag.',
+  },
+  /** Food beside the figurine, each piece loose (tools/prepare_food.py). Ids match FOOD in js/scene/geometry.js. */
+  food: [
+    { id: 'sushi', src: 'assets/food/sushi.webp', relief: 'assets/food/sushi-relief.webp', alt: '[Draft — check this] A tray of sushi.' },
+    { id: 'fries', src: 'assets/food/fries.webp', relief: 'assets/food/fries-relief.webp', alt: '[Draft — check this] A white and red paper packet of fries.' },
+    { id: 'strawberries', src: 'assets/food/strawberries.webp', relief: 'assets/food/strawberries-relief.webp', alt: '[Draft — check this] A punnet of strawberries.' },
+    { id: 'bowl', src: 'assets/food/bowl.webp', relief: 'assets/food/bowl-relief.webp', alt: '[Draft — check this] A bowl of yogurt with fruit.' },
+    { id: 'dumplings', src: 'assets/food/dumplings.webp', relief: 'assets/food/dumplings-relief.webp', alt: '[Draft — check this] A bamboo steamer of dumplings.' },
+  ],
+
   /**
    * Handwriting. Leave `font` empty to use the bundled Caveat font, or point
    * it at your own handwriting font (.woff2 / .woff / .ttf / .otf).

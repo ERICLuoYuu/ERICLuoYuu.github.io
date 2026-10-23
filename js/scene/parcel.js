@@ -5,7 +5,7 @@
  */
 
 import {
-  BOX, CONTENTS, BOOKS, FLAP_OPEN, baseOf, tapeCorners,
+  BOX, CONTENTS, BOOKS, FIGURINE, FOOD, FLAP_OPEN, baseOf, tapeCorners,
 } from './geometry.js';
 import { cssUrl } from '../core/env.js';
 import { castShadow, localOffset, shadowHull } from './shadow.js';
@@ -105,6 +105,33 @@ function buildTome({ id, x, y, width, height, thickness, rotate, ...item }) {
   return { el: tome, cover };
 }
 
+/** One body as a still picture lying at its top, its shadow cast along the light. */
+function buildSolid({ id, footprint: [w, d], height, start: [cx, cy], rotate }, withWrap) {
+  const el = h('div', 'solid', { 'data-id': id });
+  const [sx, sy] = localOffset(castShadow(height), rotate);
+  el.style.cssText = `left:${cx - w / 2}px;top:${cy - d / 2}px;width:${w}px;height:${d}px;--rot:${rotate}deg;`
+    + `--lift:${height}px;--sx:${sx.toFixed(2)}px;--sy:${sy.toFixed(2)}px;--sblur:${(1 + 0.12 * height).toFixed(2)}px`;
+  const img = h('img', 'solid-img', { alt: '', draggable: 'false' });
+  const wrap = withWrap ? h('img', 'solid-wrap', { alt: '', 'aria-hidden': 'true', draggable: 'false' }) : null;
+  el.append(...[img, wrap].filter(Boolean));
+  return { el, img, wrap };
+}
+
+/**
+ * The figurine (in its bag) and the food as still pictures at their starting
+ * places: what shows without WebGL2, and what screen readers hear. While the
+ * clothes layer draws them as bodies that can be moved, they step aside
+ * (.is-handed-over, set by main.js).
+ */
+export function buildSolids() {
+  const figurine = buildSolid(FIGURINE, true);
+  const food = Object.fromEntries(FOOD.map((def) => {
+    const { el, img } = buildSolid(def, false);
+    return [def.id, { el, img }];
+  }));
+  return { figurine, food };
+}
+
 function buildBook(text) {
   const { x, y, width, height, thickness, rotate } = CONTENTS.book;
   const book = h('div', 'book3d');
@@ -152,8 +179,15 @@ export function buildParcel(container, { text }) {
   const book = buildBook(text);
   const desiccant = buildDesiccant();
   const books = Object.fromEntries(BOOKS.map((b) => [b.id, buildTome(b)]));
+  const solids = buildSolids();
   const contents = h('div', 'contents');
-  contents.append(...Object.values(books).map((t) => t.el), desiccant, book.el);
+  contents.append(
+    ...Object.values(books).map((t) => t.el),
+    desiccant,
+    book.el,
+    solids.figurine.el,
+    ...Object.values(solids.food).map((f) => f.el),
+  );
 
   const flaps = {};
   const tapeSvgs = {};
@@ -184,7 +218,7 @@ export function buildParcel(container, { text }) {
   container.append(parcel);
 
   return {
-    parcel, flaps, tapeSvgs, tapeProbes, question, questionImg: glyphImg, book, books, desiccant,
+    parcel, flaps, tapeSvgs, tapeProbes, question, questionImg: glyphImg, book, books, desiccant, solids,
   };
 }
 
