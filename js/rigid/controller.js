@@ -9,11 +9,13 @@
 
 import { setColliders, wake } from '../cloth/solver.js';
 import { createBody, withPosition, bodyCollider } from './body.js';
-import { supportOf, settle, isResting, clothOn } from './rest.js';
+import { outlineOf } from './outline.js';
+import { supportOf, restingOn, settle, isResting, clothOn } from './rest.js';
 import { createRigidHand } from './hold.js';
 import { pickBody } from './heightfield.js';
 
 const HIGH = 1e6; // a body put somewhere at once is lowered from far above onto what lies there
+const NONE = Object.freeze([]);
 
 /**
  * @param {{defs: object[], samplers: {alpha: Function, relief: Function}[], world: object,
@@ -21,12 +23,32 @@ const HIGH = 1e6; // a body put somewhere at once is lowered from far above onto
  *   samplers[i]: body i's picture opacity and relief (0…1) at picture coordinates (u, v).
  */
 export function createRigid({ defs, samplers, world, staticColliders, ray, viewport }) {
-  let bodies = defs.map(createBody);
+  const shaped = defs.map((def, i) => Object.freeze({ ...def, outline: outlineOf(def, samplers[i].alpha) }));
+  let bodies = shaped.map(createBody);
   let supports = bodies.map(() => 0);
+  let under = bodies.map(() => NONE); // the bodies each one rests on: they hold it up even while lifted beneath it
   let checking = false; // something beneath may have changed: re-check every support next frame
 
   const collidersOf = (list) => [...staticColliders, ...list.map(bodyCollider)];
-  const supportAt = (body, xy) => supportOf(body, xy, { world, colliders: collidersOf(bodies), moving: false });
+
+  /** The colliders of the bodies lying on body `id`, and of those lying on them, and so on. */
+  function ridersOf(id) {
+    const riders = new Set([`body:${id}`]);
+    let size;
+    do {
+      size = riders.size;
+      bodies.forEach((b, i) => { if (under[i].some((name) => riders.has(name))) riders.add(`body:${b.id}`); });
+    } while (riders.size > size);
+    riders.delete(`body:${id}`);
+    return riders;
+  }
+
+  /** The colliders the hand sees beneath the held body `id`: not the bodies riding on it, which it lifts. */
+  const handColliders = (list, id) => {
+    const riders = ridersOf(id);
+    return collidersOf(list).filter((c) => !riders.has(c.name));
+  };
+  const supportAt = (body, xy) => supportOf(body, xy, { world, colliders: handColliders(bodies, body.id), moving: false });
   const hand = createRigidHand({ ray, viewport, supportAt });
 
   /** Wake the sleeping cloth lying on `body` (as it is now), so it falls when the body leaves. */
@@ -48,7 +70,9 @@ export function createRigid({ defs, samplers, world, staticColliders, ray, viewp
   /** Every body that is not held straight onto its support (at creation and reset). */
   function standAll() {
     const colliders = collidersOf(bodies);
-    supports = bodies.map((b) => supportOf(b, b.position.slice(0, 2), { world, colliders }));
+    const rests = bodies.map((b) => restingOn(b, b.position.slice(0, 2), { world, colliders }));
+    supports = rests.map((r) => r.support);
+    under = rests.map((r) => r.under);
     bodies = bodies.map((b, i) => settle(b, supports[i], 0));
     setColliders(world, collidersOf(bodies));
   }
@@ -94,9 +118,10 @@ export function createRigid({ defs, samplers, world, staticColliders, ray, viewp
       if (!instant) return hand.carry(body, home, { duration });
       if (hand.id === body.id) hand.drop();
       const lifted = withPosition(body, [...home, HIGH]);
-      const support = supportOf(lifted, home, { world, colliders: collidersOf(bodies) });
-      commit(bodies.map((b, i) => (i === index ? withPosition(body, [...home, support]) : b)));
-      supports = supports.map((s, i) => (i === index ? support : s));
+      const rest = restingOn(lifted, home, { world, colliders: collidersOf(bodies) });
+      commit(bodies.map((b, i) => (i === index ? withPosition(body, [...home, rest.support]) : b)));
+      supports = supports.map((s, i) => (i === index ? rest.support : s));
+      under = under.map((u, i) => (i === index ? rest.under : u));
       return Promise.resolve();
     },
 
@@ -107,7 +132,11 @@ export function createRigid({ defs, samplers, world, staticColliders, ray, viewp
       const placed = bodies.map((b) => (b.id === held ? hand.place(b) : b));
       if (!checking && held === null) return commit(placed);
       const colliders = collidersOf(placed);
-      supports = placed.map((b) => supportOf(b, b.position.slice(0, 2), { world, colliders, moving: b.id !== held }));
+      const rests = placed.map((b, i) => (b.id === held
+        ? restingOn(b, b.position.slice(0, 2), { world, colliders: handColliders(placed, held), moving: false })
+        : restingOn(b, b.position.slice(0, 2), { world, colliders, under: under[i] })));
+      supports = rests.map((r) => r.support);
+      under = rests.map((r, i) => (placed[i].id === held ? NONE : r.under));
       const next = placed.map((b, i) => (b.id === held ? b : settle(b, supports[i], elapsed)));
       // while something is held, keep checking: the hand may let go on its own (a carry arriving)
       checking = held !== null || next.some((b, i) => b.id !== held && !isResting(b, supports[i]));
@@ -122,7 +151,8 @@ export function createRigid({ defs, samplers, world, staticColliders, ray, viewp
     /** Every body back at its start, resting; nothing held. */
     reset() {
       hand.drop();
-      bodies = defs.map(createBody);
+      bodies = shaped.map(createBody);
+      under = bodies.map(() => NONE);
       standAll();
       checking = false;
     },

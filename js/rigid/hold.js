@@ -35,7 +35,8 @@ export function keepInside(body, [x, y]) {
  * @param {{ray: (sx: number, sy: number) => {origin: number[], dir: number[]},
  *          viewport: () => {width: number, height: number},
  *          supportAt: (body: object, xy: number[]) => number}} options
- *   supportAt: what the body would rest on were it centred at xy (rest.supportOf, cloth that moves not counted).
+ *   supportAt: what `body`, at the height it is held, would rest on were it centred at xy
+ *   (rest.supportOf in the hand's view: neither cloth that moves nor the bodies lying on it count).
  */
 export function createRigidHand({ ray, viewport, supportAt }) {
   let held = null; // { body, offset: [dx, dy, dz], height, want, xy, sx, sy, script }
@@ -46,10 +47,13 @@ export function createRigidHand({ ray, viewport, supportAt }) {
     return [clamp(cx, REACH.min[0], REACH.max[0]), clamp(cy, REACH.min[1], REACH.max[1])];
   }
 
+  /** What lies beneath the held body, were it centred at xy at the height it is held. */
+  const beneath = (xy) => supportAt(withPosition(held.body, [...xy, held.height]), xy);
+
   /** The centre for (x, y), the hand rising at once if what lies beneath wants it higher. */
   function moveTo(point) {
     const xy = confine(point);
-    const want = supportAt(held.body, xy) + LIFT;
+    const want = beneath(xy) + LIFT;
     if (want > held.height) held.height = want;
     held.want = want;
     held.xy = xy;
@@ -64,7 +68,7 @@ export function createRigidHand({ ray, viewport, supportAt }) {
     };
     let xy = centreOn(held.height);
     if (!xy) return;
-    const want = supportAt(held.body, xy) + LIFT;
+    const want = beneath(xy) + LIFT;
     if (want > held.height) {
       held.height = want;
       xy = centreOn(want) ?? xy;

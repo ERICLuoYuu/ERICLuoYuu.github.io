@@ -13,7 +13,7 @@
  * wall counts from a little way off, while a tilted flap keeps its true
  * surface height instead of growing thicker.
  */
-function boxTop({ center, axes, half }, x, y, reach) {
+export function boxTop({ center, axes, half }, x, y, reach) {
   let lo = -Infinity;
   let hi = Infinity;
   for (let k = 0; k < 3; k += 1) {
