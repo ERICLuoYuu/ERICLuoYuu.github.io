@@ -8,6 +8,7 @@ import { FIGURINE, FOOD } from '../scene/geometry.js';
 
 export const CLEARANCE = 2; // units the bag lies over the figure (tools/prepare_figurine.py)
 const SAMPLE_SCALE = 0.5; // the samplers read a half-size copy of each picture
+const FILM = 0.02; // the bag's picture is film wherever its alpha is above this
 
 async function loadImage(src) {
   const image = new Image();
@@ -44,6 +45,20 @@ function channelSampler(image, channel) {
   return (u, v) => values[clamp(v, height) * width + clamp(u, width)] / 255;
 }
 
+/**
+ * The figurine as picking sees it: the clear bag counts as the figurine. It
+ * is hit wherever there is film, at whichever is higher there, the figure
+ * or the bag (`ratio`: the bag's full height over the figure's). `shape`
+ * keeps the figure's own relief, for drawing it.
+ */
+export function bagged(figure, bag, ratio) {
+  return {
+    alpha: (u, v) => (bag.alpha(u, v) > FILM ? 1 : figure.alpha(u, v)),
+    relief: (u, v) => Math.max(figure.relief(u, v), bag.level(u, v) * ratio),
+    shape: figure.relief,
+  };
+}
+
 /** The config's food, checked against FOOD in js/scene/geometry.js: the same ids, in the same order. */
 function checkFood(food) {
   const ids = FOOD.map((f) => f.id);
@@ -57,8 +72,9 @@ function checkFood(food) {
 /**
  * @param {{figurine: {src, relief, wrap, wrapRelief}, food: {id, src, relief}[]}} config  content/site.js
  * @returns {Promise<{defs: object[], images: HTMLImageElement[], reliefs: HTMLImageElement[],
- *          wraps: ({image, relief, level}|null)[], samplers: {alpha: Function, relief: Function}[]}>}
+ *          wraps: ({image, relief, level}|null)[], samplers: {alpha: Function, relief: Function, shape: Function}[]}>}
  *   in the order FIGURINE, ...FOOD; wraps[i] is the figurine's bag (level: its height 0…1 at (u, v)), null for food.
+ *   samplers[i]: what picking sees at (u, v) (the figurine with its bag), and `shape`, the body's own relief.
  */
 export async function loadSolids({ figurine, food }) {
   if (!figurine) throw new Error('content/site.js has no figurine');
@@ -69,11 +85,17 @@ export async function loadSolids({ figurine, food }) {
   const images = items.map((_, i) => loaded[2 * i]);
   const reliefs = items.map((_, i) => loaded[2 * i + 1]);
   const [wrapImage, wrapRelief] = loaded.slice(-2);
+  const bag = { image: wrapImage, relief: wrapRelief, level: channelSampler(wrapRelief, 0) };
+  const own = items.map((_, i) => {
+    const relief = channelSampler(reliefs[i], 0);
+    return { alpha: channelSampler(images[i], 3), relief, shape: relief };
+  });
+  const ratio = (FIGURINE.height + CLEARANCE) / FIGURINE.height;
   return {
     defs: [FIGURINE, ...FOOD],
     images,
     reliefs,
-    wraps: items.map((_, i) => (i === 0 ? { image: wrapImage, relief: wrapRelief, level: channelSampler(wrapRelief, 0) } : null)),
-    samplers: items.map((_, i) => ({ alpha: channelSampler(images[i], 3), relief: channelSampler(reliefs[i], 0) })),
+    wraps: items.map((_, i) => (i === 0 ? bag : null)),
+    samplers: own.map((s, i) => (i === 0 ? bagged(s, { alpha: channelSampler(wrapImage, 3), level: bag.level }, ratio) : s)),
   };
 }

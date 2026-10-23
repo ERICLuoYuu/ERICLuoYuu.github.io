@@ -191,7 +191,7 @@ function createQuad(gl) {
 export function partsFor({ defs, images, reliefs, wraps, samplers }, resize) {
   const texel = (image) => [1 / image.naturalWidth, 1 / image.naturalHeight];
   return defs.map((def, i) => ({
-    mesh: heightfieldMesh(def, samplers[i].relief),
+    mesh: heightfieldMesh(def, samplers[i].shape),
     footprint: def.footprint,
     image: resize(images[i]),
     relief: resize(reliefs[i]),
