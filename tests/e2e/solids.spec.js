@@ -18,6 +18,45 @@ test('the figurine and every food item are drawn and can be picked up', async ({
   }
 });
 
+test("the figurine is drawn in its picture's own light, matte, not lit over again", async ({ page }) => {
+  await openSite(page, '?jump=overhead');
+  await waitForState(page, 'overhead');
+  await waitForSettled(page);
+  // At points over the figurine, away from its cut edge (where drawn and picture points need not line up
+  // to the pixel): the brightness drawn, and its picture's at the same picture point.
+  const points = await page.evaluate(async () => {
+    const EDGE = 4; // picture px
+    const lum = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const img = new Image();
+    img.src = 'assets/figurine/figurine.webp';
+    await img.decode();
+    const canvas = new OffscreenCanvas(img.naturalWidth, img.naturalHeight);
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const at = (px, py) => 4 * (Math.min(height - 1, Math.max(0, py)) * width + Math.min(width - 1, Math.max(0, px)));
+    const inside = (px, py) => [[0, 0], [EDGE, 0], [-EDGE, 0], [0, EDGE], [0, -EDGE]].every(([dx, dy]) => data[at(px + dx, py + dy) + 3] > 250);
+    const box = window.__parcel.garmentBox('figurine');
+    const found = [];
+    for (let j = 1; j < 30; j += 1) {
+      for (let i = 1; i < 30; i += 1) {
+        const [x, y] = [box.left + (box.width * i) / 30, box.top + (box.height * j) / 30];
+        const hit = window.__parcel.hit(x, y);
+        const [px, py] = hit ? [Math.floor(hit.uv[0] * width), Math.floor(hit.uv[1] * height)] : [];
+        const drawn = hit?.id === 'figurine' && inside(px, py) && window.__parcel.pixel(x, y);
+        if (drawn && drawn[3] > 250) found.push({ drawn: lum(drawn), picture: lum([...data.slice(at(px, py), at(px, py) + 3)]) });
+      }
+    }
+    return found;
+  });
+  expect(points.length, 'points on the figurine').toBeGreaterThan(120);
+  const share = (list, test) => list.filter(test).length / list.length;
+  expect(share(points, (p) => p.drawn < 0.7 * p.picture), 'drawn much darker than its picture').toBeLessThan(0.1);
+  // the clear bag over it adds a little light everywhere: only where the picture is not dark can it not explain a lot
+  const lit = points.filter((p) => p.picture >= 80);
+  expect(share(lit, (p) => p.drawn > 1.4 * p.picture), 'drawn much brighter than its picture: glossy').toBeLessThan(0.1);
+});
+
 test('without WebGL2 the figurine and the food lie still as pictures, fully visible', async ({ page }) => {
   await page.addInitScript(() => {
     const original = HTMLCanvasElement.prototype.getContext;

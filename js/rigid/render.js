@@ -19,7 +19,15 @@ import { heightfieldMesh, modelMatrix } from './heightfield.js';
 import { CLEARANCE } from './load.js';
 
 const ATTRIBUTES = ['aPos', 'aNormal', 'aUv'];
-const GLOSS = { figurine: { sheen: 0.45, power: 40 }, food: { sheen: 0.12, power: 24 }, wrap: { sheen: 0.9, power: 80 } };
+// Each surface's finish: its gloss, and how far the scene's light reshapes its picture (`relight`: 0 the
+// picture's own light alone, 1 the scene's full shading). The figurine's picture is a studio photograph
+// with its light already in it: lit over again, its skin went dark and greasy, so it is matte paint lit
+// mostly by its own light (the owner's call, 2026-10-24). Shadows cast on it still fall on it.
+const FINISH = {
+  figurine: { sheen: 0.06, power: 16, relight: 0.25 },
+  food: { sheen: 0.12, power: 24, relight: 1 },
+  wrap: { sheen: 0.9, power: 80, relight: 1 },
+};
 const PX = 4; // pixels a unit in the bodies' pictures
 const DETAIL = 0.2; // share of the relief map's slope added on top of the heightfield's own shading
 const CONTACT = { grow: 1.5, growPerLift: 0.25, above: 0.15, alpha: 0.55, fade: 15 };
@@ -80,8 +88,10 @@ in vec2 vUv;
 out vec4 outColor;
 ${RELIEF_NORMAL}`;
 
-// A painted, glazed solid: firm shading, a gloss that follows the light, a crisp cut-out edge.
+// A painted solid: shading as far as uRelight lets the scene's light reshape the picture (the rest is
+// the even shade of a flat top), a gloss that follows the light, a crisp cut-out edge.
 const SOLID_FS = `${SURFACE_HEAD}
+uniform float uRelight;
 void main() {
   vec4 tex = texture(uTex, vUv); // premultiplied on upload
   float alpha = clamp((tex.a - 0.5) / max(fwidth(tex.a), 1e-4) + 0.5, 0.0, 1.0);
@@ -90,7 +100,8 @@ void main() {
   vec3 n = relief(normalize(vNormal));
   vec3 toEye = normalize(uEye - vPos);
   float sun = sunlit(vShadow);
-  float shade = max(0.0, dot(n, uLightDir)) * 0.7 + 0.35;
+  float even = max(0.0, uLightDir.z) * 0.7 + 0.35; // a flat top's shade ('flat' is a GLSL keyword)
+  float shade = mix(even, max(0.0, dot(n, uLightDir)) * 0.7 + 0.35, uRelight);
   float gloss = pow(max(0.0, dot(n, normalize(uLightDir + toEye))), uPower) * uSheen * sun;
   vec3 color = base * shade * mix(0.6, 1.0, sun) + gloss;
   color = mix(color, ${DARK_GLSL}, (1.0 - uLightLevel) * 0.95);
@@ -153,7 +164,7 @@ void main() {
 
 /** A heightfield's buffers and its pictures on the GPU. */
 function createSurface(gl, {
-  mesh, image, relief, reliefTexel, sheen, power, bump,
+  mesh, image, relief, reliefTexel, sheen, power, relight, bump,
 }, anisotropy) {
   const vao = gl.createVertexArray();
   gl.bindVertexArray(vao);
@@ -171,6 +182,7 @@ function createSurface(gl, {
     reliefTexel,
     sheen,
     power,
+    relight,
     bump,
   };
 }
@@ -197,21 +209,21 @@ export function partsFor({ defs, images, reliefs, wraps, samplers }, resize) {
     relief: resize(reliefs[i]),
     reliefTexel: texel(reliefs[i]),
     bump: (DETAIL * def.height * PX) / 2,
-    ...GLOSS[def.id === 'figurine' ? 'figurine' : 'food'],
+    ...FINISH[def.id === 'figurine' ? 'figurine' : 'food'],
     wrap: wraps[i] && {
       mesh: heightfieldMesh({ footprint: def.footprint, height: def.height + CLEARANCE }, wraps[i].level),
       image: resize(wraps[i].image),
       relief: resize(wraps[i].relief),
       reliefTexel: texel(wraps[i].relief),
       bump: (DETAIL * (def.height + CLEARANCE) * PX) / 2,
-      ...GLOSS.wrap,
+      ...FINISH.wrap,
     },
   }));
 }
 
 /**
  * @param gl     the clothes layer's WebGL2 context
- * @param parts  partsFor(): each body's {mesh, footprint, image, relief, reliefTexel, bump, sheen, power, wrap?}
+ * @param parts  partsFor(): each body's {mesh, footprint, image, relief, reliefTexel, bump, sheen, power, relight, wrap?}
  */
 export function createRigidRenderer(gl, { parts }) {
   const anisotropy = gl.getExtension('EXT_texture_filter_anisotropic');
@@ -308,6 +320,7 @@ export function createRigidRenderer(gl, { parts }) {
       gl.uniformMatrix4fv(uniforms.uModel, false, model);
       gl.uniform1f(uniforms.uSheen, surface.sheen);
       gl.uniform1f(uniforms.uPower, surface.power);
+      if (uniforms.uRelight) gl.uniform1f(uniforms.uRelight, surface.relight); // the solids' shader only
       gl.uniform1f(uniforms.uBump, surface.bump);
       gl.uniform2fv(uniforms.uReliefTexel, surface.reliefTexel);
       gl.activeTexture(gl.TEXTURE2);

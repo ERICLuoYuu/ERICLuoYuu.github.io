@@ -168,8 +168,12 @@ need and is stated in the test.
 - Each body is a heightfield mesh: a grid over its footprint (about 2 units
   apart), raised by its relief × its height, built once in body space and
   moved by one matrix per frame.
-- The same light as the garments, with gloss: moderate for the figurine's
-  painted resin, faint for food. Bodies cast into and receive the shadow map.
+- The same light as the garments, with gloss: faint for food; the figurine
+  is matte. The figurine's picture is a studio photograph with its light
+  already in it, so the scene's light reshapes it only a quarter of the way
+  (the rest is the even shade of a flat top): lit fully, its skin went dark
+  and greasy (owner's revision, 2026-10-24). Its volume shows in its height,
+  its shadows and the bag's glints. Bodies cast into and receive the shadow map.
   A soft contact shadow lies under each body: tight and dark at rest, wider and
   fainter as it is lifted.
 - The wrap is its own heightfield just above the figurine, drawn in the film
