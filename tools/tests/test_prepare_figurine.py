@@ -1,8 +1,13 @@
+from pathlib import Path
+
 import numpy as np
 import pytest
 from PIL import Image
+from scipy import ndimage
 
 import prepare_figurine as pf
+
+RED = (180.0, 40.0, 40.0)
 
 
 def figure_png(tmp_path):
@@ -12,6 +17,47 @@ def figure_png(tmp_path):
     path = tmp_path / "chosen.png"
     Image.fromarray(rgb).save(path)
     return path
+
+
+FIGURE = (lambda yy, xx: ((xx - 250) / 120) ** 2 + ((yy - 450) / 380) ** 2 <= 1)(*np.mgrid[0:900, 0:500])
+
+
+def backdrop_png(tmp_path, sole=False):
+    """A figure (x 130–370, y 70–830) on a grey backdrop whose light falls off from left to right,
+    with its shadow cast to the right of it, soft edges and a little noise: as an image model draws it.
+    With `sole`, its lowest 70 px are the backdrop's own grey, like a pale sandal's sole."""
+    yy, xx = np.mgrid[0:900, 0:500]
+    grey = np.array([188.0, 187.0, 190.0]) * np.linspace(1.06, 0.97, 500)[None, :, None]
+    shadow = ((xx - 290) / 120) ** 2 + ((yy - 470) / 380) ** 2 <= 1
+    rgb = np.where(FIGURE[..., None], RED, np.where(shadow[..., None], 0.7 * grey, grey))
+    if sole:
+        rgb = np.where((FIGURE & (yy >= 760))[..., None], grey, rgb)
+    rgb = ndimage.gaussian_filter(rgb, (1, 1, 0)) + np.random.default_rng(1).normal(0, 5, rgb.shape)
+    path = tmp_path / "backdrop.png"
+    Image.fromarray(np.clip(np.round(rgb), 0, 255).astype(np.uint8)).save(path)
+    return path
+
+
+def test_a_cast_shadow_and_a_falling_light_are_cut_away_with_the_backdrop(tmp_path):
+    cut = pf.cut_out(backdrop_png(tmp_path), None, "auto")
+    assert abs(cut.shape[0] - 761) <= 6 and abs(cut.shape[1] - 241) <= 6, f"cropped to {cut.shape[:2]}, the figure is 761 × 241"
+
+
+def test_with_the_model_s_outline_a_part_as_grey_as_the_backdrop_stays(tmp_path, monkeypatch):
+    outline = ndimage.gaussian_filter(FIGURE.astype(float), 4)  # soft, as u2net's is
+    monkeypatch.setattr(pf, "u2net_matte", lambda rgb, model: outline)
+    cut = pf.cut_out(backdrop_png(tmp_path, sole=True), Path("u2netp.onnx"), "auto")
+    assert abs(cut.shape[0] - 761) <= 6 and abs(cut.shape[1] - 241) <= 6, f"cropped to {cut.shape[:2]}, the figure is 761 × 241"
+    assert (cut[-40:-10, 100:140, 3] == 255).all(), "the sole is part of the figure"
+
+
+def test_an_edge_against_the_shadow_keeps_the_figure_s_own_colour(tmp_path):
+    cut = pf.cut_out(backdrop_png(tmp_path), None, "auto")
+    a = cut[..., 3] / 255
+    right = (a > 0.2) & (a < 0.9) & (np.arange(cut.shape[1]) > cut.shape[1] // 2)[None, :]
+    assert right.sum() > 100
+    off = np.abs(cut[..., :3][right] - RED).mean()
+    assert off < 20, f"the edge beside the shadow is {off:.0f} levels off the figure's colour"
 
 
 @pytest.fixture(scope="module")

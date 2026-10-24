@@ -1,5 +1,6 @@
 import numpy as np
-from solids.cutout import border_colour, key_matte, rounded_matte, unmix
+from scipy import ndimage
+from solids.cutout import border_colour, held_by_shape, key_matte, rounded_matte, unmix
 from solids.relief import relief
 from solids.finish import add_grain, fit_canvas, remove_marks
 
@@ -45,6 +46,18 @@ def test_fit_canvas_keeps_proportions_and_centres():
     out = fit_canvas(rgba, (80, 80))
     cols = np.nonzero(out[..., 3].max(axis=0))[0]
     assert out.shape[:2] == (80, 80) and cols.min() == 20 and cols.max() == 59
+
+
+def test_the_object_s_shape_holds_the_key_whole_inside_and_clears_it_far_outside():
+    square = np.zeros((60, 60)); square[10:50, 10:50] = 1
+    shape = ndimage.gaussian_filter(square, 2)  # the soft outline a salient-object model gives
+    key = square.copy()
+    key[10:25, 20:30] = 0  # a backdrop-grey part of the object, at its edge, that the key cut away
+    key[10:50, 50:58] = 1  # a shadow beside the object that the key kept
+    held = held_by_shape(key, shape, inset=3)
+    assert held[20, 25] == 1, "the part inside the outline is whole again"
+    assert held[30, 56] == 0, "the shadow outside the outline is gone"
+    assert held[30, 9] == key[30, 9] and held[30, 10] == key[30, 10], "at the outline's edge the key decides"
 
 
 def test_a_tray_filling_its_photo_is_cut_to_a_rounded_rectangle():

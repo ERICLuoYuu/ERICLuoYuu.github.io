@@ -25,7 +25,7 @@ from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # run as a script: make `solids` importable
 
-from solids.cutout import border_colour, key_matte, u2net_matte, unmix  # noqa: E402
+from solids.cutout import background_beside, held_by_shape, key_matte, u2net_matte, unmix, without_specks  # noqa: E402
 from solids.finish import add_grain, fit_canvas, match_light  # noqa: E402
 from solids.relief import relief  # noqa: E402
 from solids.wrap import bag  # noqa: E402
@@ -41,15 +41,22 @@ MARGIN = (8, 16)  # units between the figure and the bag's sides, and its ends (
 RELIEF_RADIUS = 12  # units: the figure's dome reaches full height this far in
 RELIEF_DETAIL = 0.15
 PLAIN = 12.0  # a border whose colour varies more than this (std) is not plain: use u2net
+SHADES = (0.3, 1.1)  # the backdrop's grey from its contact shadows (this share of it) to where its light is brightest
+TOLERANCE = 14.0  # colour distance from those shades still counted as backdrop (a generated backdrop keeps within ~7)
+SPECK = 0.002  # parts of the matte smaller than this share of the figure are noise in the backdrop
+INSET = 4  # px: within this of u2net's soft outline, the key draws the edge
 EDGE = 0.02  # alpha below this is empty when cropping
 TURNS = {"0": 0, "90": 1, "-90": -1, "180": 2}  # quarter turns counter-clockwise (np.rot90)
 
 
 def matte(rgb: np.ndarray, u2net: Path | None) -> np.ndarray:
-    """Alpha in [0, 1]: a colour key on a plain border, else the u2net model."""
+    """Alpha in [0, 1]: on a plain border, a colour key that takes the backdrop's shadows with it, held
+    to u2net's outline of the figure when the model is given (so grey sandals and clear glasses stay);
+    on any other border, the u2net model alone."""
     border = np.concatenate([rgb[0], rgb[-1], rgb[:, 0], rgb[:, -1]])
     if border.std(axis=0).max() <= PLAIN:
-        return key_matte(rgb)
+        key = without_specks(key_matte(rgb, tolerance=TOLERANCE, shades=SHADES), SPECK)
+        return key if u2net is None else held_by_shape(key, u2net_matte(rgb, u2net), INSET)
     if u2net is None:
         raise SystemExit("the picture's background is not plain: pass --u2net PATH to the u2net model")
     return u2net_matte(rgb, u2net)
@@ -65,7 +72,7 @@ def cut_out(source: Path, u2net: Path | None, turn: str) -> np.ndarray:
     """The figure, cut out, unmixed, cropped and stood upright: RGBA float."""
     rgb = np.asarray(Image.open(source).convert("RGB"), float)
     alpha = matte(rgb, u2net)
-    colour = unmix(rgb, alpha, border_colour(rgb))
+    colour = unmix(rgb, alpha, background_beside(rgb, alpha))
     ys, xs = np.nonzero(alpha > EDGE)
     cut = np.concatenate([colour, alpha[..., None] * 255], axis=-1)[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
     return turned(cut, turn)
