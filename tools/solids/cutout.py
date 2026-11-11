@@ -115,6 +115,64 @@ def held_by_shape(alpha: np.ndarray, shape: np.ndarray, inset: int, whole: float
     return np.where(core, 1.0, np.where(np.asarray(shape) < faint, 0.0, np.asarray(alpha, float)))
 
 
+def _upsample(channel: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
+    """A 2-D array stretched bilinearly to `shape` (height, width)."""
+    picture = Image.fromarray(np.asarray(channel, np.float32), mode="F")
+    return np.asarray(picture.resize((shape[1], shape[0]), Image.BILINEAR), float)
+
+
+def guided_filter(guide: np.ndarray, p: np.ndarray, radius: int, eps: float, subsample: int = 1) -> np.ndarray:
+    """`p` with its edges moved onto the colour image `guide`'s (He, Sun and Tang's guided filter).
+
+    Within each (2 radius + 1)² window, `p` is fitted as a linear function of
+    the guide's colour, so where the guide changes sharply, so does the
+    result. A salient-object model's soft outline thus follows the photo's
+    real edge. `guide` is H×W×3 in [0, 1]; `eps` is the regularisation (in
+    the guide's squared units): larger smooths more.
+
+    With `subsample` s > 1 the fit is made on every s-th pixel and stretched
+    back (He and Sun's fast guided filter): about s² times less memory, while
+    the edge still follows the full-size guide, applied at the end.
+    """
+    guide = np.asarray(guide, float)
+    p = np.asarray(p, float)
+    g, q = guide[::subsample, ::subsample], p[::subsample, ::subsample]
+    r = max(1, round(radius / subsample))
+    box = lambda x: ndimage.uniform_filter(x, size=2 * r + 1, mode="reflect")  # noqa: E731
+    mean_i = np.stack([box(g[..., c]) for c in range(3)], axis=-1)
+    mean_q = box(q)
+    cov_iq = np.stack([box(g[..., c] * q) for c in range(3)], axis=-1) - mean_i * mean_q[..., None]
+    var_i = np.empty(q.shape + (3, 3))
+    for i in range(3):
+        for j in range(i, 3):
+            var_i[..., i, j] = var_i[..., j, i] = box(g[..., i] * g[..., j]) - mean_i[..., i] * mean_i[..., j]
+    a = np.linalg.solve(var_i + eps * np.eye(3), cov_iq[..., None])[..., 0]
+    del var_i, cov_iq  # the largest arrays: free them before the full-size step
+    b = mean_q - (a * mean_i).sum(axis=-1)
+    mean_a = [box(a[..., c]) for c in range(3)]
+    mean_b = box(b)
+    if subsample > 1:
+        mean_a = [_upsample(m, p.shape) for m in mean_a]
+        mean_b = _upsample(mean_b, p.shape)
+    return sum(m * guide[..., c] for c, m in enumerate(mean_a)) + mean_b
+
+
+def foreground_beside(rgb: np.ndarray, alpha: np.ndarray, solid: float = 0.95) -> np.ndarray:
+    """Each soft-edge pixel's colour (alpha below `solid`) taken from the nearest solid pixel of the object.
+
+    Where the object's edge is soft, its pixels show the background through
+    them (grass, say); with the object's own colour there, the alpha alone
+    fades it out and no background tints the edge. The solid object keeps
+    its own colours; with nothing solid, the picture is returned as it is.
+    """
+    rgb = np.asarray(rgb, float)[..., :3]
+    whole = np.asarray(alpha) >= solid
+    if not whole.any():
+        return rgb.copy()
+    _, (iy, ix) = ndimage.distance_transform_edt(~whole, return_indices=True)
+    return np.where(whole[..., None], rgb, rgb[iy, ix])
+
+
 def background_beside(rgb: np.ndarray, alpha: np.ndarray) -> np.ndarray:
     """Each pixel's own background: the colour of the nearest pixel cut away entirely (alpha 0).
 

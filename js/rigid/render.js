@@ -20,11 +20,12 @@ import { CLEARANCE } from './load.js';
 
 const ATTRIBUTES = ['aPos', 'aNormal', 'aUv'];
 // Each surface's finish: its gloss, and how far the scene's light reshapes its picture (`relight`: 0 the
-// picture's own light alone, 1 the scene's full shading). The figurine's picture is a studio photograph
-// with its light already in it: lit over again, its skin went dark and greasy, so it is matte paint lit
-// mostly by its own light (the owner's call, 2026-10-24). Shadows cast on it still fall on it.
+// picture's own light alone, 1 the scene's full shading). The figurine is the owner's photo, its sunlight
+// already in it: lit fully over again, its skin goes dark and greasy at the edges. Shaded halfway, its
+// smooth dome still rounds the arms and legs like a doll's (the owner's pick, 2026-11-11). Shadows cast
+// on it still fall on it.
 const FINISH = {
-  figurine: { sheen: 0.06, power: 16, relight: 0.25 },
+  figurine: { sheen: 0.08, power: 20, relight: 0.5 },
   food: { sheen: 0.12, power: 24, relight: 1 },
   wrap: { sheen: 0.9, power: 80, relight: 1 },
 };

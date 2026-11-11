@@ -17,10 +17,10 @@ function parts() {
   }, (image) => image);
 }
 
-test("the figurine is lit mostly by its picture's own light, and matte; the food keeps the scene's full shading", () => {
+test("the figurine is shaded halfway: rounder than its photo alone, not lit over again like the food", () => {
   const [figurine, food] = parts();
-  assert.ok(figurine.relight < 0.5, `the scene relights the figurine's picture ${figurine.relight}`);
-  assert.ok(figurine.sheen < food.sheen, 'painted matte: less gloss than the food');
+  assert.ok(figurine.relight >= 0.4 && figurine.relight <= 0.6, `the scene relights the figurine's photo ${figurine.relight}`);
+  assert.ok(figurine.sheen < food.sheen, 'matte: less gloss than the food');
   assert.equal(food.relight, 1);
   assert.equal(figurine.wrap.sheen > figurine.sheen, true, 'its clear bag still glints');
 });

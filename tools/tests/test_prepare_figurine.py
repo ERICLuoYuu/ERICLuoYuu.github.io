@@ -60,6 +60,67 @@ def test_an_edge_against_the_shadow_keeps_the_figure_s_own_colour(tmp_path):
     assert off < 20, f"the edge beside the shadow is {off:.0f} levels off the figure's colour"
 
 
+BLUE = (40.0, 60.0, 180.0)
+
+
+def test_a_phone_photo_stored_turned_is_cut_the_right_way_up(tmp_path):
+    yy, _ = np.mgrid[0:900, 0:500]
+    rgb = np.where(FIGURE[..., None], RED, (188.0, 187.0, 190.0))
+    rgb = np.where((FIGURE & (yy < 200))[..., None], BLUE, rgb)  # a blue head at the top
+    exif = Image.Exif()
+    exif[0x0112] = 3  # the orientation flag: "turn me half round to view"
+    path = tmp_path / "phone.jpg"
+    Image.fromarray(np.rot90(rgb, 2).astype(np.uint8)).save(path, quality=95, exif=exif)
+    cut = pf.cut_out(path, None, "0")
+    top = cut[:100][cut[:100, :, 3] > 127]
+    assert top[:, 2].mean() > top[:, 0].mean(), "the blue head is at the top"
+
+
+def grass_png(tmp_path, scale=1):
+    """The figure (x 180–420, y 70–830, times `scale`) sitting on grass: a busy, green, uneven background."""
+    h, w = 900 * scale, 600 * scale
+    yy, xx = np.mgrid[0:h, 0:w]
+    figure = ((xx - 300 * scale) / (120 * scale)) ** 2 + ((yy - 450 * scale) / (380 * scale)) ** 2 <= 1
+    light = np.random.default_rng(2).uniform(0.55, 1.45, (h, w, 1))
+    rgb = np.where(figure[..., None], RED, np.array([70.0, 140.0, 40.0]) * light)
+    path = tmp_path / "grass.png"
+    Image.fromarray(np.clip(np.round(ndimage.gaussian_filter(rgb, (1, 1, 0))), 0, 255).astype(np.uint8)).save(path)
+    return path
+
+
+def red_finder(rgb, model):
+    """A stand-in for u2net: it knows the red figure, but draws its outline soft, as the model does."""
+    return ndimage.gaussian_filter((rgb[..., 0] - rgb[..., 1] > 60).astype(float), max(rgb.shape[:2]) / 60)
+
+
+def test_a_person_on_grass_is_cut_to_their_own_edge_without_the_grass_s_green(tmp_path, monkeypatch):
+    monkeypatch.setattr(pf, "u2net_matte", red_finder)
+    cut = pf.cut_out(grass_png(tmp_path), Path("u2netp.onnx"), "auto")
+    assert abs(cut.shape[0] - 761) <= 6 and abs(cut.shape[1] - 241) <= 6, f"cropped to {cut.shape[:2]}, the figure is 761 × 241"
+    a = cut[..., 3] / 255
+    edge = (a > 0.1) & (a < 0.9)
+    perimeter = 1770  # px around the figure's ellipse
+    assert edge.sum() < 3 * perimeter, f"{edge.sum()} px of soft edge: the outline was not pulled onto the photo's edge"
+    assert edge.sum() > perimeter / 2, f"{edge.sum()} px of soft edge: a jagged cut, not an antialiased one"
+    faint = ((a > 0) & (a < 0.1)).sum()
+    assert faint < perimeter / 2, f"{faint} px of faint glow around the edge: the grass's texture leaking through"
+    off = np.abs(cut[..., :3][edge] - RED).mean()
+    assert off < 20, f"the edge is {off:.0f} levels off the figure's colour: the grass shows through it"
+
+
+def test_a_large_photo_is_cut_at_a_working_size(tmp_path, monkeypatch):
+    monkeypatch.setattr(pf, "u2net_matte", red_finder)
+    cut = pf.cut_out(grass_png(tmp_path, scale=3), Path("u2netp.onnx"), "auto")
+    assert abs(cut.shape[0] - pf.WORK_LENGTH) <= 0.03 * pf.WORK_LENGTH, f"the figure is {cut.shape[0]} px long"
+
+
+def test_the_figure_s_height_is_a_smooth_dome_without_the_photo_s_texture():
+    a = FIGURE.astype(float)
+    flat = np.full(FIGURE.shape + (3,), 150.0)
+    striped = flat * (1 + 0.4 * (np.arange(FIGURE.shape[0]) // 4 % 2))[:, None, None]  # skin texture, grass blades
+    assert (pf.figure_level(a, striped) == pf.figure_level(a, flat)).all()
+
+
 @pytest.fixture(scope="module")
 def made(tmp_path_factory):
     """The four pictures, made once for the module (encoding them takes seconds)."""
@@ -98,3 +159,33 @@ def test_the_bag_lies_over_the_figure_everywhere(made):
     fig_h = level[on] / 255 * pf.HEIGHT
     bag_h = wrap_level[on] / 255 * (pf.HEIGHT + pf.CLEARANCE)
     assert (bag_h >= fig_h + 0.5).all()
+
+
+def test_the_figure_s_arms_and_legs_are_round_without_a_ridge_down_their_middle():
+    strip = np.zeros((200, 161)); strip[:, 40:121] = 1  # a leg, 20 units across
+    level = pf.figure_level(strip, np.full((200, 161, 3), 150.0)).astype(float)
+    p = level[100]
+    ridge = (p[80] - p[79]) - (p[81] - p[80])  # how far the slope turns within a pixel at the middle
+    assert ridge <= 2, f"the slope turns {ridge:.0f} levels at once down the middle: a seam"
+
+
+def test_a_photo_on_a_busy_background_asks_for_the_model(tmp_path):
+    with pytest.raises(SystemExit, match="--u2net"):
+        pf.cut_out(grass_png(tmp_path), None, "auto")
+
+
+def test_a_photo_with_no_one_in_it_says_so(tmp_path, monkeypatch):
+    monkeypatch.setattr(pf, "u2net_matte", lambda rgb, model: np.zeros(rgb.shape[:2]))
+    with pytest.raises(SystemExit, match="no one"):
+        pf.cut_out(grass_png(tmp_path), Path("u2netp.onnx"), "auto")
+
+
+def test_where_the_photo_has_no_edge_the_cut_fades_out_without_a_rim(monkeypatch):
+    yy, xx = np.mgrid[0:200, 0:200]
+    disc = (np.hypot(xx - 100, yy - 100) < 50).astype(float)
+    monkeypatch.setattr(pf, "u2net_matte", lambda rgb, model: disc)
+    flat = np.full((200, 200, 3), 120.0)  # the model's outline crosses no colour edge in the photo
+    ray = pf.busy_matte(flat, Path("u2netp.onnx"))[100, 100:]
+    step = np.abs(np.diff(ray)).max()
+    assert step < 0.1, f"the soft edge drops {step:.2f} at once: a hard rim"
+    assert ray[-1] == 0

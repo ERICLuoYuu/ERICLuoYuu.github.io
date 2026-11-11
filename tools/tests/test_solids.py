@@ -1,6 +1,6 @@
 import numpy as np
 from scipy import ndimage
-from solids.cutout import border_colour, held_by_shape, key_matte, rounded_matte, unmix
+from solids.cutout import border_colour, foreground_beside, guided_filter, held_by_shape, key_matte, rounded_matte, unmix
 from solids.relief import relief
 from solids.finish import add_grain, fit_canvas, remove_marks
 
@@ -73,3 +73,58 @@ def test_grain_is_laid_over_like_the_box_s_at_half_opacity():
     out = add_grain(rgb, np.ones((4, 4)), grain)
     assert out[0, 0, 0] == 100 and out[2, 2, 0] == 100 and out[1, 1, 0] == 200
     assert add_grain(rgb, np.zeros((4, 4)), grain)[0, 0, 0] == 200, "nothing outside the object"
+
+
+def test_a_soft_outline_is_pulled_onto_the_picture_s_own_edge():
+    guide = np.zeros((40, 80, 3)); guide[:, :40] = (0.8, 0.15, 0.15); guide[:, 40:] = (0.25, 0.55, 0.15)  # red | green
+    soft = ndimage.gaussian_filter(np.where(np.arange(80) < 40, 1.0, 0.0)[None, :].repeat(40, 0), (0, 6))
+    assert soft[20, 39] - soft[20, 40] < 0.1, "the outline is soft where the picture is sharp"
+    sharp = guided_filter(guide, soft, radius=8, eps=1e-3)
+    assert sharp[20, 39] - sharp[20, 40] > 0.4, "a step where the picture's colour changes"
+    assert abs(sharp[20, 38] - sharp[20, 39]) < 0.05 and abs(sharp[20, 40] - sharp[20, 41]) < 0.05, "and nowhere else"
+
+
+def test_a_soft_edge_takes_the_colour_of_the_object_beside_it():
+    rgb = np.zeros((1, 5, 3))
+    rgb[0, :2] = (200.0, 150.0, 120.0)  # skin
+    rgb[0, 2:] = (90.0, 160.0, 50.0)  # grass, showing through the soft edge
+    alpha = np.array([[1.0, 1.0, 0.6, 0.2, 0.0]])
+    out = foreground_beside(rgb, alpha)
+    assert (out[0, 2] == (200, 150, 120)).all() and (out[0, 3] == (200, 150, 120)).all(), "the edge is skin"
+    assert (out[0, :2] == rgb[0, :2]).all(), "the solid object keeps its own colours"
+    assert rgb[0, 2, 1] == 160, "the input is not changed"
+
+
+def crease(level, row=50, middle=40):
+    """How far the slope turns within a pixel at a strip's middle: a ridge turns it at once and shades as a
+    hard light/dark seam; a round top turns it gradually."""
+    p = level[row].astype(float)
+    return (p[middle] - p[middle - 1]) - (p[middle + 1] - p[middle])
+
+
+def test_a_smoothed_dome_is_round_across_a_thin_part_without_a_ridge_down_its_middle():
+    strip = np.zeros((100, 81)); strip[:, 20:61] = 1  # an arm or a leg, 41 px across
+    grey = np.full((100, 81, 3), 150.0)
+    sharp = relief(strip, grey, radius_px=30, detail=0.0)
+    round_ = relief(strip, grey, radius_px=30, detail=0.0, smooth_px=8)
+    assert crease(round_) < 0.25 * crease(sharp), f"ridge {crease(round_):.0f} against {crease(sharp):.0f} unsmoothed"
+    assert round_[50, 40] == 255 and round_[50, 10] == 0 and round_[50, 70] == 0
+
+
+def test_a_filter_fitted_on_every_second_pixel_matches_the_full_one_in_far_less_memory():
+    import tracemalloc
+
+    yy, xx = np.mgrid[0:600, 0:600]
+    inside = np.hypot(xx - 300, yy - 300) < 180
+    guide = np.where(inside[..., None], (0.8, 0.2, 0.2), (0.3, 0.55, 0.15)) + np.random.default_rng(3).normal(0, 0.03, (600, 600, 3))
+    soft = ndimage.gaussian_filter(inside.astype(float), 6)
+    peaks = []
+    for subsample in (1, 2):
+        tracemalloc.start()
+        out = guided_filter(guide, soft, radius=10, eps=1e-3, subsample=subsample)
+        peaks.append(tracemalloc.get_traced_memory()[1])
+        tracemalloc.stop()
+        if subsample == 1:
+            full = out
+    assert np.abs(out - full).mean() < 0.01, "the same edge"
+    assert peaks[1] < 0.4 * peaks[0], f"{peaks[1] / 2**20:.0f} MB against {peaks[0] / 2**20:.0f} MB"

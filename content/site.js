@@ -79,14 +79,14 @@ export default {
     { id: 'siddhartha', cover: 'assets/books/siddhartha.webp', alt: 'Siddhartha, by Hermann Hesse' },
   ],
 
-  /** You as a small painted figurine in a clear bag, along the left wall (tools/prepare_figurine.py makes these files). */
+  /** You, cut out of your photo like a doll packed in a clear bag, along the left wall (tools/prepare_figurine.py makes these files). */
   figurine: {
     src: 'assets/figurine/figurine.webp',
     relief: 'assets/figurine/figurine-relief.webp',
     wrap: 'assets/figurine/wrap.webp',
     wrapRelief: 'assets/figurine/wrap-relief.webp',
     // A plain description of what is visible. Reword it in your own voice, then remove "[Draft — check this]".
-    alt: '[Draft — check this] A small painted figure of a person in a red top and blue floral skirt, leaning back on their hands, sealed in a crinkled clear plastic bag.',
+    alt: '[Draft — check this] A cut-out photo of a person in glasses, a red top and a blue floral skirt, sitting back on their hands, packed like a doll in a crinkled clear plastic bag.',
   },
   /** Food beside the figurine, each piece loose (tools/prepare_food.py). Ids match FOOD in js/scene/geometry.js. */
   food: [

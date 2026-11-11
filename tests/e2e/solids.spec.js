@@ -18,7 +18,7 @@ test('the figurine and every food item are drawn and can be picked up', async ({
   }
 });
 
-test("the figurine is drawn in its picture's own light, matte, not lit over again", async ({ page }) => {
+test("the figurine is drawn mostly in its photo's own light: shaded halfway, matte, not lit over again", async ({ page }) => {
   await openSite(page, '?jump=overhead');
   await waitForState(page, 'overhead');
   await waitForSettled(page);

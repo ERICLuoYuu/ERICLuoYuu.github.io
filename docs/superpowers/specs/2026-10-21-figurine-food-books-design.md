@@ -80,7 +80,15 @@ books at their real proportions.
   the background is not plain enough), colour-matched to the box's light,
   with the scene's fine grain added and no sharpening;
 - `figurine-relief.webp` — height: the silhouette inflated into a soft dome
-  (distance transform) plus fine detail from the picture's luminance;
+  (distance transform), smooth (revision 2026-11-11: no detail from the
+  picture's luminance);
+- revision 2026-11-11: the source may be the owner's own photo on a busy
+  background (`F:\parcel-art\figure.jpg`, kept outside the repo): turned
+  upright from its orientation flag, cropped to the person u2net finds, the
+  model's outline cut at 0.5 and softened onto the photo's own edges with a
+  guided filter (fitted on every second pixel, for memory), stretched to
+  a crisp edge that fades without a rim, the edge taking the subject's own
+  colour;
 - `wrap.webp` + `wrap-relief.webp` — the bag, drawn procedurally: a loose
   pillow outline around the figure, crimped seals top and bottom, mostly clear
   film that is denser where it bunches, crinkle lines and creases that live
@@ -169,10 +177,13 @@ need and is stated in the test.
   apart), raised by its relief × its height, built once in body space and
   moved by one matrix per frame.
 - The same light as the garments, with gloss: faint for food; the figurine
-  is matte. The figurine's picture is a studio photograph with its light
-  already in it, so the scene's light reshapes it only a quarter of the way
-  (the rest is the even shade of a flat top): lit fully, its skin went dark
-  and greasy (owner's revision, 2026-10-24). Its volume shows in its height,
+  is matte. The figurine is the owner's own photo (owner's revision,
+  2026-11-11: "me, like a doll in a bag", replacing the generated figure of
+  2026-10-24), its sunlight already in it, so the scene's light reshapes it
+  only halfway (the rest is the even shade of a flat top): lit fully, its
+  skin goes dark and greasy at the edges. Its relief is a smooth dome from
+  its outline, without the picture's fine detail, which on a photo (skin,
+  grass blades) shaded as grooves. Its volume shows in its height,
   its shadows and the bag's glints. Bodies cast into and receive the shadow map.
   A soft contact shadow lies under each body: tight and dark at rest, wider and
   fainter as it is lifted.

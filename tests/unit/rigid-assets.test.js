@@ -6,7 +6,7 @@ import { webpSize } from './webp.js';
 
 // spec §1 Budget (the garments keep their own 3 MB test): the measured total
 // after Task 10, rounded up to the next 0.25 MB, and no more than 1.5 MB.
-// Measured 0.17 MB with the owner's figurine (if new pictures come out larger
+// Measured 0.18 MB with the owner's photo as the figurine (if new pictures come out larger
 // than the budget, lower the WebP quality).
 const BODY_BUDGET = 0.25 * 2 ** 20;
 
