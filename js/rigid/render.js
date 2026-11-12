@@ -24,11 +24,13 @@ const ATTRIBUTES = ['aPos', 'aNormal', 'aUv'];
 // (`shadowed`). The figurine is the owner's photo, a level slab: its sunlight and shadows are what make it
 // look solid, and the scene's light over them only dulls and streaks it, its own shadow only blots it, and
 // on its level top a gloss is no highlight, only a veil that greys the whole photo (the owner's pick,
-// 2026-11-12). It still casts its shadow on the box, and its bag still glints.
+// 2026-11-12). It still casts its shadow on the box, and its bag still glints. Its face is small on screen: its
+// picture is sampled one level sharper than the screen's size alone asks (`lodBias`), so the shadows that model
+// the features are not blurred away.
 const FINISH = {
-  figurine: { sheen: 0, power: 20, relight: 0, shadowed: false },
-  food: { sheen: 0.12, power: 24, relight: 1, shadowed: true },
-  wrap: { sheen: 0.9, power: 80, relight: 1, shadowed: true },
+  figurine: { sheen: 0, power: 20, relight: 0, shadowed: false, lodBias: -1 },
+  food: { sheen: 0.12, power: 24, relight: 1, shadowed: true, lodBias: 0 },
+  wrap: { sheen: 0.9, power: 80, relight: 1, shadowed: true, lodBias: 0 },
 };
 const PX = 4; // pixels a unit in the bodies' pictures
 const DETAIL = 0.2; // share of the relief map's slope added on top of the heightfield's own shading
@@ -99,8 +101,9 @@ ${RELIEF_NORMAL}`;
 const SOLID_FS = `${SURFACE_HEAD}
 uniform float uRelight;
 uniform float uShadowed;
+uniform float uLodBias;
 void main() {
-  vec4 tex = texture(uTex, vUv); // premultiplied on upload
+  vec4 tex = texture(uTex, vUv, uLodBias); // premultiplied on upload
   float alpha = clamp((tex.a - 0.5) / max(fwidth(tex.a), 1e-4) + 0.5, 0.0, 1.0);
   if (alpha < 0.01) discard;
   vec3 base = tex.rgb / max(tex.a, 1e-3);
@@ -171,7 +174,7 @@ void main() {
 
 /** A heightfield's buffers and its pictures on the GPU. */
 function createSurface(gl, {
-  mesh, image, relief, reliefTexel, sheen, power, relight, shadowed, bump,
+  mesh, image, relief, reliefTexel, sheen, power, relight, shadowed, lodBias, bump,
 }, anisotropy) {
   const vao = gl.createVertexArray();
   gl.bindVertexArray(vao);
@@ -191,6 +194,7 @@ function createSurface(gl, {
     power,
     relight,
     shadowed,
+    lodBias,
     bump,
   };
 }
@@ -231,7 +235,7 @@ export function partsFor({ defs, images, reliefs, wraps, samplers }, resize) {
 
 /**
  * @param gl     the clothes layer's WebGL2 context
- * @param parts  partsFor(): each body's {mesh, footprint, image, relief, reliefTexel, bump, sheen, power, relight, shadowed, wrap?}
+ * @param parts  partsFor(): each body's {mesh, footprint, image, relief, reliefTexel, bump, sheen, power, relight, shadowed, lodBias, wrap?}
  */
 export function createRigidRenderer(gl, { parts }) {
   const anisotropy = gl.getExtension('EXT_texture_filter_anisotropic');
@@ -330,6 +334,7 @@ export function createRigidRenderer(gl, { parts }) {
       gl.uniform1f(uniforms.uPower, surface.power);
       if (uniforms.uRelight) gl.uniform1f(uniforms.uRelight, surface.relight); // the solids' shader only
       if (uniforms.uShadowed) gl.uniform1f(uniforms.uShadowed, surface.shadowed ? 1 : 0);
+      if (uniforms.uLodBias) gl.uniform1f(uniforms.uLodBias, surface.lodBias);
       gl.uniform1f(uniforms.uBump, surface.bump);
       gl.uniform2fv(uniforms.uReliefTexel, surface.reliefTexel);
       gl.activeTexture(gl.TEXTURE2);

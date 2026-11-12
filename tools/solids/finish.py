@@ -33,6 +33,18 @@ def add_grain(rgb: np.ndarray, alpha: np.ndarray, grain: np.ndarray, strength: f
     return np.clip(rgb * (1 - cover) + tiled[..., :3] * cover, 0, 255)
 
 
+def sharpen(rgb: np.ndarray, alpha: np.ndarray, radius_px: float, amount: float) -> np.ndarray:
+    """The picture's fine light and dark steepened (an unsharp mask: plus `amount` times its difference from
+    its blur over `radius_px`), within the object only. The blur is taken over the object alone, so that the
+    empty surround neither darkens nor lightens its edge; flat colour is left as it is.
+    """
+    rgb = np.asarray(rgb, float)[..., :3]
+    a = np.clip(np.asarray(alpha, float), 0.0, 1.0)
+    weight = np.maximum(ndimage.gaussian_filter(a, radius_px), 1e-6)[..., None]
+    blur = np.stack([ndimage.gaussian_filter(rgb[..., c] * a, radius_px) for c in range(3)], axis=-1) / weight
+    return np.where(a[..., None] > 0, np.clip(rgb + amount * (rgb - blur), 0, 255), rgb)
+
+
 def _resize(channel: np.ndarray, size: tuple[int, int]) -> np.ndarray:
     return np.asarray(Image.fromarray(channel.astype(np.float32), mode="F").resize(size, Image.LANCZOS))
 

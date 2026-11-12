@@ -127,6 +127,18 @@ def test_the_figure_s_top_is_level_but_for_its_rounded_edge_so_a_face_near_the_o
     assert row[40 + unit] < 0.8 * level.max(), f"1 unit in it is already at {row[40 + unit]:.0f} of {level.max():.0f}: a cliff, not a rounded edge"
 
 
+def test_the_figure_s_fine_light_and_dark_is_sharpened_for_its_small_size_on_screen():
+    yy, xx = np.mgrid[0:200, 0:200]
+    figure = np.zeros((200, 200, 4), np.uint8)
+    figure[..., 3] = 255 * (np.hypot(xx - 100, yy - 100) < 80)
+    figure[..., :3] = np.where(((xx // 6) % 2 == 0)[..., None], 90, 140)  # fine stripes, like a face's features
+    shown = pf.sharpened(figure)
+    inside = figure[..., 3] == 255
+    before, after = figure[..., 0][inside].astype(float).std(), shown[..., 0][inside].astype(float).std()
+    assert after > 1.1 * before, f"the stripes' contrast went from {before:.1f} to {after:.1f}"
+    assert (shown[..., 3] == figure[..., 3]).all(), "the outline is as it was"
+
+
 def test_the_figure_s_height_is_smooth_without_the_photo_s_texture():
     a = FIGURE.astype(float)
     flat = np.full(FIGURE.shape + (3,), 150.0)

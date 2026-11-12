@@ -2,7 +2,7 @@ import numpy as np
 from scipy import ndimage
 from solids.cutout import border_colour, foreground_beside, guided_filter, held_by_shape, key_matte, rounded_matte, unmix
 from solids.relief import relief
-from solids.finish import add_grain, fit_canvas, remove_marks
+from solids.finish import add_grain, fit_canvas, remove_marks, sharpen
 
 
 def disc(size, colour, background):
@@ -128,3 +128,15 @@ def test_a_filter_fitted_on_every_second_pixel_matches_the_full_one_in_far_less_
             full = out
     assert np.abs(out - full).mean() < 0.01, "the same edge"
     assert peaks[1] < 0.4 * peaks[0], f"{peaks[1] / 2**20:.0f} MB against {peaks[0] / 2**20:.0f} MB"
+
+
+def test_sharpening_steepens_a_step_inside_the_figure_and_leaves_its_flat_colour_and_edge_alone():
+    rgb = np.full((60, 60, 3), 100.0)
+    rgb[:, 30:] = 150.0  # a step from dark to light inside the figure, like a feature's shadow
+    alpha = np.zeros((60, 60))
+    alpha[10:50, 10:50] = 1
+    out = sharpen(rgb, alpha, radius_px=3, amount=0.6)
+    assert out[30, 28, 0] < 97 and out[30, 31, 0] > 153, "darker beside the step's dark side, lighter beside its light side"
+    assert abs(out[30, 15, 0] - 100) < 1 and abs(out[30, 45, 0] - 150) < 1, "the flat colour away from the step is as it was"
+    assert abs(out[12, 20, 0] - 100) < 1, "nor does the figure's edge change: the empty surround is not blurred in"
+    assert rgb[30, 28, 0] == 100, "the input is not changed"

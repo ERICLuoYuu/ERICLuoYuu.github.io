@@ -40,7 +40,6 @@ const CARRY_SPEED = 320; // units a second for a keyboard move...
 const CARRY_TIME = [0.8, 1.6]; // ...taking between these many seconds
 const CLEAR_SHIFT = 700; // clearAside(): far enough right to be off the box
 const CONTEXT = { alpha: true, premultipliedAlpha: true, antialias: true, depth: true, stencil: false };
-const BODY_PX = 4; // pixels a unit in the figurine's and the food's pictures
 const BOOK = fromRect({ ...CONTENTS.book, id: 'booklet' }, 0.6); // the booklet as a body: .book3d sits at translateZ(.6px)
 const COVER_TOP = BOOK.position[2] + BOOK.height;
 /** Does a body lie over the booklet: over its cover, and no lower than the cover? */
@@ -57,6 +56,7 @@ const DISABLED = Object.freeze({
   clearAside() {},
   pickAt: () => null,
   pixelAt: () => null,
+  regionAt: () => null,
   grab() {},
   dragTo() {},
   release() {},
@@ -220,7 +220,9 @@ function createLayer({
       bump: g.material.bump ?? 0,
     };
   });
-  const rigidParts = rigid && partsFor(solids, (image) => resized(image, textureScale(BODY_PX, need)));
+  // The figurine's and the food's pictures are small (4 px a unit): uploaded whole, so that the figurine's face,
+  // sampled sharper (its lodBias), keeps the detail a copy at the screen's size would have lost.
+  const rigidParts = rigid && partsFor(solids, (image) => image);
   let rigidRenderer = null;
   const makeRenderer = () => {
     rigidRenderer = rigidParts ? createRigidRenderer(gl, { parts: rigidParts }) : null;
@@ -544,6 +546,22 @@ function createLayer({
       const out = new Uint8Array(4);
       gl.readPixels(Math.round(sx * ratio), canvas.height - 1 - Math.round(sy * ratio), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, out);
       return [...out];
+    },
+    /**
+     * The colours drawn over a screen box (CSS pixels), at the canvas's own resolution, before the browser
+     * scales it to the screen: {width, height, data: [r, g, b, a, ...]}, rows from the top, premultiplied (tests).
+     */
+    regionAt(sx, sy, sw, sh) {
+      if (!visible || lost) return null;
+      draw();
+      const ratio = canvas.width / (canvas.clientWidth || innerWidth);
+      const [x, y] = [Math.round(sx * ratio), Math.round(sy * ratio)];
+      const [w, h] = [Math.max(1, Math.round(sw * ratio)), Math.max(1, Math.round(sh * ratio))];
+      const rows = new Uint8Array(4 * w * h);
+      gl.readPixels(x, canvas.height - y - h, w, h, gl.RGBA, gl.UNSIGNED_BYTE, rows);
+      const data = new Uint8Array(rows.length);
+      for (let r = 0; r < h; r += 1) data.set(rows.subarray(4 * w * (h - 1 - r), 4 * w * (h - r)), 4 * w * r); // GL reads from the bottom
+      return { width: w, height: h, data: Array.from(data) };
     },
     grab,
     dragTo,

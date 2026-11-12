@@ -113,7 +113,9 @@ flaps or the table.
 **The figurine.** It is your own photo, cut out by a tool and raised into a
 thin slab with a level top and a rounded edge. It keeps the photo's own
 colours and light: its sunlight and shadows are what make it look solid, so
-the scene neither shades it again nor lays a shadow or a gloss over it. It
+the scene neither shades it again nor lays a shadow or a gloss over it. Its
+face is small on screen, so the picture is gently sharpened and drawn from
+its sharper detail, and the shadows that model the features stay. It
 still casts its shadow on the box. Its bag is clear film: it shows by its
 seals, its edges and the glints along its creases, and the creases keep off
 the head, so no glint crosses the face and no milky veil greys the photo.

@@ -387,6 +387,7 @@ async function start() {
     clearAside: () => app.clothes.clearAside(),
     project: (point) => app.clothes.project(point),
     pixel: (x, y) => app.clothes.pixelAt(x, y),
+    region: (x, y, w, h) => app.clothes.regionAt(x, y, w, h),
   };
 }
 

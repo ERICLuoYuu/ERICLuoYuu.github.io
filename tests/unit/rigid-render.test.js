@@ -23,6 +23,8 @@ test("the figurine shows its photo's own light: not lit over again, nor shadowed
   assert.equal(figurine.shadowed, false, 'the photo already has its shadows');
   assert.equal(food.relight, 1);
   assert.equal(food.shadowed, true);
+  assert.equal(figurine.lodBias, -1, 'its small face sampled from the sharper picture level');
+  assert.equal(food.lodBias, 0);
   assert.equal(figurine.sheen, 0, 'on its level top a gloss is no highlight, only a veil over the whole photo');
   assert.equal(figurine.wrap.sheen > figurine.sheen, true, 'its clear bag still glints');
 });

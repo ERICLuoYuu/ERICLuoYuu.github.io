@@ -9,7 +9,8 @@ own colour. Phone photos are turned the right way up first. Stand its long side 
 the figure the clothes were fitted to (FIGURE_LENGTH from head to sole) or
 smaller if the bag's margins need it and centre it on the figurine's footprint
 at PX pixels a unit, in the photo's own colours: its sunlight and shadows are
-what make it look solid. Raise it into a slab with a level top and a rounded
+what make it look solid, its fine light and dark sharpened for its small size
+on screen. Raise it into a slab with a level top and a rounded
 edge, then wrap it: a crinkled clear bag with crimped seals lying over it, its
 creases kept off the head so that no glint crosses the face.
 
@@ -40,7 +41,7 @@ from solids.cutout import (  # noqa: E402
     unmix,
     without_specks,
 )
-from solids.finish import fit_canvas  # noqa: E402
+from solids.finish import fit_canvas, sharpen  # noqa: E402
 from solids.relief import relief  # noqa: E402
 from solids.wrap import bag  # noqa: E402
 
@@ -50,6 +51,8 @@ HEIGHT = 15  # units: FIGURINE.height (thicker, the slab's side shows, stretched
 CLEARANCE = 2  # units the bag lies over the figure
 FIGURE_LENGTH = 248  # units from head to sole, as clothes/fit.py measures the figure
 MARGIN = (8, 16)  # units between the figure and the bag's sides, and its ends (with the seals)
+SHARPEN = (3.0, 0.6)  # px and amount: the face is small on screen (some 0.44 of the picture's size on a 1x screen), so
+# its fine light and dark, the shadows that model the features, is steepened at about a screen pixel's scale
 HEAD = 0.2  # share of the upright figure's length, from its top, that is its head
 HEAD_ROOM = 4  # units: the bag's creases keep this far off the head, and fade back in over as far again
 RELIEF_RADIUS = 4  # units: the edge rounds up to the level top this far in (a deeper dome sinks a face near the outline)
@@ -161,6 +164,12 @@ def figure_level(alpha: np.ndarray, rgb: np.ndarray) -> np.ndarray:
     return relief(alpha, rgb, radius_px=RELIEF_RADIUS * PX, detail=RELIEF_DETAIL, smooth_px=RELIEF_SMOOTH * PX)
 
 
+def sharpened(figure: np.ndarray) -> np.ndarray:
+    """The figure's picture as saved (RGBA uint8): its fine light and dark steepened by SHARPEN, its outline as it was."""
+    rgb = sharpen(figure[..., :3], figure[..., 3] / 255, radius_px=SHARPEN[0], amount=SHARPEN[1])
+    return np.concatenate([np.round(rgb).astype(np.uint8), figure[..., 3:4]], axis=-1)
+
+
 def head_room(alpha: np.ndarray) -> np.ndarray:
     """Where the bag's creases keep off (0-1): the figure's head, the top HEAD of its length, and HEAD_ROOM
     around it, fading out over HEAD_ROOM more."""
@@ -187,7 +196,7 @@ def main(argv: list[str] | None = None) -> int:
     film, film_level = bag(figure.shape[1::-1], figure[..., 3], level, px=PX, figure_height=HEIGHT, clearance=CLEARANCE,
                            keep_off=head_room(figure[..., 3] / 255))
 
-    Image.fromarray(figure, "RGBA").save(args.out / "figurine.webp", "WEBP", quality=88, alpha_quality=100, method=6)
+    Image.fromarray(sharpened(figure), "RGBA").save(args.out / "figurine.webp", "WEBP", quality=88, alpha_quality=100, method=6)
     Image.fromarray(level, "L").save(args.out / "figurine-relief.webp", "WEBP", quality=90, method=6)
     Image.fromarray(film, "RGBA").save(args.out / "wrap.webp", "WEBP", quality=88, alpha_quality=100, method=6)
     Image.fromarray(np.round(film_level * 255).astype(np.uint8), "L").save(args.out / "wrap-relief.webp", "WEBP", quality=90, method=6)
