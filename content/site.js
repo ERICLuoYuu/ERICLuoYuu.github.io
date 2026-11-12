@@ -36,7 +36,7 @@ export default {
     movedAside: 'The {garment} is out of the way.',
     moveFailed: 'The {garment} could not be moved just now. Try again, or drag it aside.',
     bookUncovered: 'The little book is uncovered.',
-    bookTitle: 'Human User Manual',
+    bookTitle: 'Xiaoyi Chen',
     ownerLine: 'this little book belongs to',
     ownerName: 'Xiaoyi',
     readerHint: 'drag a page corner, or use ← →',

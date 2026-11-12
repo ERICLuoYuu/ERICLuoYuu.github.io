@@ -36,7 +36,6 @@ Product specification & operating instructions
 
 - **Product name:** Xiaoyi
 - **Model:** XY-2005
-- **Document ID:** XY-2005-MAN-01
 
 **Document profile.** A structured reference for the configuration, operating modes, preferences, maintenance requirements, and known limitations of one creative individual.
 
@@ -456,4 +455,4 @@ Successful interaction requires sincerity, patience, humor, and respect for pers
 
 ### End of document
 
-Document ID: XY-2005-MAN-01 | Product: Xiaoyi / XY-2005 | Revision: 1.0
+Product: Xiaoyi / XY-2005 | Revision: 1.0

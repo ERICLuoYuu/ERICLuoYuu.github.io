@@ -55,7 +55,14 @@ test('the booklet is the owner’s manual: no placeholders left, its fourteen se
   assert.deepEqual(steps.map((b) => b.number), MANUAL_SECTIONS.map((_, i) => i + 1));
 });
 
-test('the cover and the owner label carry the manual’s title and the owner’s name', () => {
-  assert.equal(config.text.bookTitle, 'Human User Manual');
+test('the cover carries the owner’s full name and the owner label their given name', () => {
+  assert.equal(config.text.bookTitle, 'Xiaoyi Chen');
   assert.equal(config.text.ownerName, 'Xiaoyi');
+});
+
+test('the booklet leaves out the manual’s document ID', async () => {
+  const { sections } = parseBook(await read(config.book.source));
+  const text = sections.flat().map((b) => b.html ?? (b.items ?? []).join(' ')).join(' ');
+  assert.doesNotMatch(text, /Document ID|XY-2005-MAN/i);
+  assert.match(text, /Revision: 1\.0/, 'the closing line keeps its product and revision');
 });
