@@ -130,7 +130,7 @@ the head, so no glint crosses the face and no milky veil greys the photo.
    plain backdrop works too.
 2. Make the four pictures from it:
 
-       python tools/prepare_figurine.py F:/parcel-art/figure.jpg assets/figurine --u2net F:/portrait-collage/models/u2netp.onnx --lens 2422,1377,52.4,19.1,52
+       python tools/prepare_figurine.py F:/parcel-art/figure.jpg assets/figurine --u2net F:/portrait-collage/models/u2netp.onnx --lens 2422,1377,52.4,19.1,52 --grass 0.38
 
    It turns a phone photo the right way up, then cuts you out. On a busy
    background (grass, a room) the u2net model finds you, the photo is
@@ -154,6 +154,16 @@ the head, so no glint crosses the face and no milky veil greys the photo.
    semi-axes in the photo's pixels, the right way up as a viewer shows it,
    and the tilt of its first axis from the x axis in degrees (towards y).
    The values above are for `figure.jpg`; give `--lens` again for a second lens.
+
+   Standing in grass, you have blades across your feet and tufts round them
+   that the cut keeps as part of you. `--grass SHARE` takes them off that
+   share of your length from the soles up (0.38 for `figure.jpg`: up the
+   shins, short of the dress, whose print has green in it): thin lines much
+   darker than the skin or sandal behind them, and anything green, are
+   painted over in the colour round them, and the ragged outline the tufts
+   left is rounded off. A pink shadow (between toes) and a sandal's faint
+   seam are kept. Where grass hid part of a foot, it is filled in from what
+   is next to it.
 
 **The food.** It comes from your photos, cut out without brands:
 

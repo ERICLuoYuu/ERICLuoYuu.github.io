@@ -141,6 +141,35 @@ def test_the_command_line_takes_a_lens_for_the_far_side_of_the_glasses(tmp_path,
     assert wire(made[0]) == 0 and wire(with_lens) > 300, f"{wire(with_lens)} px of wire"
 
 
+BLADE = (60.0, 60.0, 30.0)
+
+
+def bladed_png(tmp_path):
+    """The lilac figure with a blade of grass across its feet (its left end, which is turned to be its bottom),
+    the blade's ends sticking out past its outline."""
+    path = figure_png(tmp_path, LILAC)
+    rgb = np.asarray(Image.open(path)).copy()
+    rgb[100:300, 120:122] = BLADE
+    Image.fromarray(rgb).save(path)
+    return path
+
+
+def test_the_command_line_takes_the_grass_off_the_figure_s_feet(tmp_path):
+    blade = lambda pic: ((pic[..., 3] > 200) & (np.abs(pic[..., :3].astype(float) - BLADE).max(axis=-1) < 30)).sum()  # noqa: E731
+    pictures = {}
+    for name, extra in (("kept", []), ("off", ["--grass", "0.3"])):
+        assert pf.main([str(bladed_png(tmp_path)), str(tmp_path / name), *extra]) == 0
+        pictures[name] = np.asarray(Image.open(tmp_path / name / "figurine.webp"))
+    assert blade(pictures["kept"]) > 40, f"{blade(pictures['kept'])} px of blade without --grass"
+    assert blade(pictures["off"]) < 10, f"{blade(pictures['off'])} px of blade left with --grass"
+
+
+def test_the_command_line_refuses_a_share_of_grass_outside_0_to_1(tmp_path, capsys):
+    with pytest.raises(SystemExit):
+        pf.main([str(figure_png(tmp_path, LILAC)), str(tmp_path / "out"), "--grass", "1.5"])
+    assert "at most 1" in capsys.readouterr().err, "the error says what a share may be"
+
+
 def test_the_figure_s_top_is_level_but_for_its_rounded_edge_so_a_face_near_the_outline_is_not_sunk():
     yy, xx = np.mgrid[0:200, 0:200]
     head = (np.hypot(xx - 100, yy - 100) < 60).astype(float)  # 15 units across its radius

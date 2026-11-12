@@ -1,6 +1,7 @@
 """The owner's figurine in its clear bag, from the picture they chose.
 
     python tools/prepare_figurine.py <chosen.png> assets/figurine [--turn auto|0|90|-90|180] [--u2net PATH]
+        [--lens X,Y,A,B,DEG] [--grass SHARE]
 
 Cut the figure out of its background: a colour key on a plain backdrop (held to the
 u2net model's outline when it is given); on a busy one, such as a photo of the owner on
@@ -44,6 +45,7 @@ from solids.cutout import (  # noqa: E402
     without_specks,
 )
 from solids.finish import fit_canvas, sharpen  # noqa: E402
+from solids.grass import parse_share, without_grass  # noqa: E402
 from solids.lens import Lens, drawn_lens, parse_lens  # noqa: E402
 from solids.relief import relief  # noqa: E402
 from solids.wrap import bag  # noqa: E402
@@ -143,9 +145,10 @@ def turned(rgba: np.ndarray, turn: str) -> np.ndarray:
     return np.rot90(rgba, quarters)
 
 
-def cut_out(source: Path, u2net: Path | None, turn: str, lenses: Sequence[Lens] = ()) -> np.ndarray:
+def cut_out(source: Path, u2net: Path | None, turn: str, lenses: Sequence[Lens] = (), grass: float = 0.0) -> np.ndarray:
     """The figure, cut out, its edge cleaned, cropped and stood upright: RGBA float. `lenses` (in the photo's
-    pixels, the right way up) are the far lenses of glasses the cut left out, drawn back behind the figure."""
+    pixels, the right way up) are the far lenses of glasses the cut left out, drawn back behind the figure; with
+    `grass` (a share of its length), the grass is taken off that much of the figure from its soles up."""
     picture = load(source)
     pixels = np.asarray(picture)
     if is_plain(pixels):
@@ -164,7 +167,8 @@ def cut_out(source: Path, u2net: Path | None, turn: str, lenses: Sequence[Lens] 
         colour, alpha = drawn_lens(colour, alpha, rgb, lens.moved(origin, scale))
     ys, xs = np.nonzero(alpha > EDGE)
     cut = np.concatenate([colour, alpha[..., None] * 255], axis=-1)[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
-    return turned(cut, turn)
+    upright = turned(cut, turn)
+    return without_grass(upright, grass) if grass else upright
 
 
 def place(cut: np.ndarray) -> np.ndarray:
@@ -208,12 +212,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--lens", type=parse_lens, action="append", default=[], metavar="X,Y,A,B,DEG",
                         help="a far lens of glasses the cut leaves out (it shows the background through it), to draw back: "
                              "its centre and semi-axes in the photo's pixels, the right way up, and its long axis's tilt in degrees")
+    parser.add_argument("--grass", type=parse_share, default=0.0, metavar="SHARE",
+                        help="take the grass off the figure's feet (blades across them, tufts round them) over this share of "
+                             "its length from the soles up, above 0 and at most 1 (default: none)")
     args = parser.parse_args(argv)
     if not args.chosen.exists():
         parser.error(f"no such picture: {args.chosen}")
     args.out.mkdir(parents=True, exist_ok=True)
 
-    figure = place(cut_out(args.chosen, args.u2net, args.turn, args.lens))
+    figure = place(cut_out(args.chosen, args.u2net, args.turn, args.lens, args.grass))
     level = figure_level(figure[..., 3] / 255, figure[..., :3])
     film, film_level = bag(figure.shape[1::-1], figure[..., 3], level, px=PX, figure_height=HEIGHT, clearance=CLEARANCE,
                            keep_off=head_room(figure[..., 3] / 255))
