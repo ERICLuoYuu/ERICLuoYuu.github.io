@@ -117,6 +117,30 @@ def test_a_large_photo_is_cut_at_a_working_size(tmp_path, monkeypatch):
     assert abs(cut.shape[0] - pf.WORK_LENGTH) <= 0.03 * pf.WORK_LENGTH, f"the figure is {cut.shape[0]} px long"
 
 
+WIRE = (120.0, 108.0, 95.0)
+
+
+def test_a_far_lens_given_in_the_photo_s_pixels_is_drawn_back_where_it_is_in_the_cut(tmp_path, monkeypatch):
+    monkeypatch.setattr(pf, "u2net_matte", red_finder)
+    photo = grass_png(tmp_path, scale=3)  # cut at a working size: the lens moves and shrinks with the photo
+    plain = pf.cut_out(photo, Path("u2netp.onnx"), "auto")
+    lens = pf.Lens(centre=(470.0, 1350.0), axes=(60.0, 30.0), tilt=90.0)  # beside the figure, which starts at x 540
+    cut = pf.cut_out(photo, Path("u2netp.onnx"), "auto", lenses=[lens])
+    wider = cut.shape[1] - plain.shape[1]
+    assert 60 <= wider <= 72, f"the cut grew {wider} px to the left, the lens's far side is some 67 px out at this size"
+    a = cut[..., 3] / 255
+    ring = (a > 0.9) & (np.abs(cut[..., :3] - WIRE).max(axis=-1) < 3)
+    assert ring[:, :40].sum() > 100, "the ring is drawn beside the figure"
+
+
+def test_the_command_line_takes_a_lens_for_the_far_side_of_the_glasses(tmp_path, made):
+    out = tmp_path / "out"
+    assert pf.main([str(figure_png(tmp_path, LILAC)), str(out), "--lens", "450,355,40,18,0"]) == 0
+    wire = lambda pic: ((pic[..., 3] > 200) & (np.abs(pic[..., :3].astype(float) - WIRE).max(axis=-1) < 20)).sum()  # noqa: E731
+    with_lens = np.asarray(Image.open(out / "figurine.webp"))
+    assert wire(made[0]) == 0 and wire(with_lens) > 300, f"{wire(with_lens)} px of wire"
+
+
 def test_the_figure_s_top_is_level_but_for_its_rounded_edge_so_a_face_near_the_outline_is_not_sunk():
     yy, xx = np.mgrid[0:200, 0:200]
     head = (np.hypot(xx - 100, yy - 100) < 60).astype(float)  # 15 units across its radius

@@ -26,10 +26,12 @@ const ATTRIBUTES = ['aPos', 'aNormal', 'aUv'];
 // on its level top a gloss is no highlight, only a veil that greys the whole photo (the owner's pick,
 // 2026-11-12). It still casts its shadow on the box, and its bag still glints. Its face is small on screen: its
 // picture is sampled one level sharper than the screen's size alone asks (`lodBias`), so the shadows that model
-// the features are not blurred away.
+// the features are not blurred away. A body's `contact` shadow, where it meets what it rests on, spreads
+// `grow` units past its outline at `alpha` darkness: the figurine's spreads further, as a 15-unit slab's would,
+// so its sunlit face's edge (a face turned away, its nose) stands out from the box floor, which is as pale.
 const FINISH = {
-  figurine: { sheen: 0, power: 20, relight: 0, shadowed: false, lodBias: -1 },
-  food: { sheen: 0.12, power: 24, relight: 1, shadowed: true, lodBias: 0 },
+  figurine: { sheen: 0, power: 20, relight: 0, shadowed: false, lodBias: -1, contact: { grow: 4.5, alpha: 0.6 } },
+  food: { sheen: 0.12, power: 24, relight: 1, shadowed: true, lodBias: 0, contact: { grow: 1.5, alpha: 0.55 } },
   wrap: { sheen: 0.9, power: 80, relight: 1, shadowed: true, lodBias: 0 },
 };
 const PX = 4; // pixels a unit in the bodies' pictures
@@ -37,7 +39,7 @@ const DETAIL = 0.2; // share of the relief map's slope added on top of the heigh
 // share of a crease's glint that the bag's flat film catches: clear film hardly glints, and a broad sheen
 // over it greys the photo's shadows beneath
 const FLAT_GLINT = 0.03;
-const CONTACT = { grow: 1.5, growPerLift: 0.25, above: 0.15, alpha: 0.55, fade: 15 };
+const CONTACT = { growPerLift: 0.25, above: 0.15, fade: 15 }; // lifted, a contact shadow spreads and fades
 const DARK_GLSL = `vec3(${DARK.map((c) => c.toFixed(4)).join(', ')})`;
 
 const SHADOW_VS = `#version 300 es
@@ -235,7 +237,7 @@ export function partsFor({ defs, images, reliefs, wraps, samplers }, resize) {
 
 /**
  * @param gl     the clothes layer's WebGL2 context
- * @param parts  partsFor(): each body's {mesh, footprint, image, relief, reliefTexel, bump, sheen, power, relight, shadowed, lodBias, wrap?}
+ * @param parts  partsFor(): each body's {mesh, footprint, image, relief, reliefTexel, bump, sheen, power, relight, shadowed, lodBias, contact, wrap?}
  */
 export function createRigidRenderer(gl, { parts }) {
   const anisotropy = gl.getExtension('EXT_texture_filter_anisotropic');
@@ -257,7 +259,8 @@ export function createRigidRenderer(gl, { parts }) {
     placements = bodies.map((body, i) => {
       const [x, y, z] = body.position;
       const lift = Math.max(0, z - supports[i]);
-      const grow = CONTACT.grow + CONTACT.growPerLift * lift;
+      const { contact } = parts[i];
+      const grow = contact.grow + CONTACT.growPerLift * lift;
       return {
         model: modelMatrix(body),
         contact: {
@@ -265,7 +268,7 @@ export function createRigidRenderer(gl, { parts }) {
           half: body.footprint.map((v) => (v / 2) * (1 - body.inset)),
           footprint: body.footprint,
           grow,
-          alpha: CONTACT.alpha / (1 + lift / CONTACT.fade),
+          alpha: contact.alpha / (1 + lift / CONTACT.fade),
           lod: Math.log2(Math.max(1, grow * texels[i])),
         },
       };

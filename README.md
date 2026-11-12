@@ -116,7 +116,10 @@ colours and light: its sunlight and shadows are what make it look solid, so
 the scene neither shades it again nor lays a shadow or a gloss over it. Its
 face is small on screen, so the picture is gently sharpened and drawn from
 its sharper detail, and the shadows that model the features stay. It
-still casts its shadow on the box. Its bag is clear film: it shows by its
+still casts its shadow on the box, and darkens the floor softly just past its
+outline, as a slab lying there would: sunlit skin is about as pale as the box
+floor, and without that shadow the profile of a face turned away, nose and
+all, melts into it. Its bag is clear film: it shows by its
 seals, its edges and the glints along its creases, and the creases keep off
 the head, so no glint crosses the face and no milky veil greys the photo.
 
@@ -127,7 +130,7 @@ the head, so no glint crosses the face and no milky veil greys the photo.
    plain backdrop works too.
 2. Make the four pictures from it:
 
-       python tools/prepare_figurine.py F:/parcel-art/figure.jpg assets/figurine --u2net F:/portrait-collage/models/u2netp.onnx
+       python tools/prepare_figurine.py F:/parcel-art/figure.jpg assets/figurine --u2net F:/portrait-collage/models/u2netp.onnx --lens 2422,1377,52.4,19.1,52
 
    It turns a phone photo the right way up, then cuts you out. On a busy
    background (grass, a room) the u2net model finds you, the photo is
@@ -137,11 +140,20 @@ the head, so no glint crosses the face and no milky veil greys the photo.
    the backdrop's shadows with it, held to the model's outline so parts as
    grey as the backdrop stay. It stands you upright
    (`--turn auto|0|90|-90|180`), sizes you to the figure the clothes were
-   fitted to (248 units from head to sole), matches you to the box's light
-   and wraps you in a clear pillow bag with crimped seals. It writes
+   fitted to (248 units from head to sole), keeping the photo's own colours
+   and light, and wraps you in a clear pillow bag with crimped seals. It writes
    `figurine.webp`, `figurine-relief.webp` (the height, for the 3D surface),
    `wrap.webp` and `wrap-relief.webp` (the bag), each 500 × 1160 px: the
    figurine's 125 × 290-unit footprint at 4 px a unit.
+
+   With your face turned away, your glasses' far lens shows the background
+   through it, so the model cuts it away with the background, and with it
+   the frame round your nose. `--lens X,Y,A,B,DEG` draws it back behind you:
+   a thin ring the colour of the wire, and the photo's own glare in the
+   glass (the box shows through the rest). Give its centre and its two
+   semi-axes in the photo's pixels, the right way up as a viewer shows it,
+   and the tilt of its first axis from the x axis in degrees (towards y).
+   The values above are for `figure.jpg`; give `--lens` again for a second lens.
 
 **The food.** It comes from your photos, cut out without brands:
 

@@ -28,3 +28,11 @@ test("the figurine shows its photo's own light: not lit over again, nor shadowed
   assert.equal(figurine.sheen, 0, 'on its level top a gloss is no highlight, only a veil over the whole photo');
   assert.equal(figurine.wrap.sheen > figurine.sheen, true, 'its clear bag still glints');
 });
+
+test("the figurine's contact shadow spreads past its outline, so its pale edge stands out from the pale floor; the food's is as it was", () => {
+  const [figurine, food] = parts();
+  assert.deepEqual(food.contact, { grow: 1.5, alpha: 0.55 });
+  assert.ok(figurine.contact.grow >= 3 * food.contact.grow, `the figurine's spreads ${figurine.contact.grow} units`);
+  assert.ok(figurine.contact.alpha >= food.contact.alpha);
+  assert.equal(figurine.wrap.contact, undefined, 'its clear bag casts no contact shadow of its own');
+});

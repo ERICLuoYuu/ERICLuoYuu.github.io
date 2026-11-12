@@ -23,7 +23,9 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections.abc import Sequence
 from pathlib import Path
+from typing import NamedTuple
 
 import numpy as np
 from PIL import Image, ImageOps
@@ -42,6 +44,7 @@ from solids.cutout import (  # noqa: E402
     without_specks,
 )
 from solids.finish import fit_canvas, sharpen  # noqa: E402
+from solids.lens import Lens, drawn_lens, parse_lens  # noqa: E402
 from solids.relief import relief  # noqa: E402
 from solids.wrap import bag  # noqa: E402
 
@@ -92,7 +95,15 @@ def plain_matte(rgb: np.ndarray, u2net: Path | None) -> np.ndarray:
     return key if u2net is None else held_by_shape(key, u2net_matte(rgb, u2net), INSET)
 
 
-def subject_crop(picture: Image.Image, u2net: Path) -> Image.Image:
+class Crop(NamedTuple):
+    """A photo cropped at `origin` (px) and then resized by `scale`."""
+
+    picture: Image.Image
+    origin: tuple[float, float]
+    scale: float
+
+
+def subject_crop(picture: Image.Image, u2net: Path) -> Crop:
     """The busy photo cropped to its subject, as the model finds them, with their long side at most WORK_LENGTH."""
     small = picture.copy()
     small.thumbnail((LOOK_LENGTH, LOOK_LENGTH))
@@ -103,9 +114,12 @@ def subject_crop(picture: Image.Image, u2net: Path) -> Image.Image:
     length = (max(ys.max() - ys.min(), xs.max() - xs.min()) + 1) * k
     m = CROP_MARGIN * length
     box = (max(0, xs.min() * k - m), max(0, ys.min() * k - m), min(picture.width, (xs.max() + 1) * k + m), min(picture.height, (ys.max() + 1) * k + m))
+    origin = (round(box[0]), round(box[1]))
     crop = picture.crop(tuple(round(v) for v in box))
     scale = WORK_LENGTH / length
-    return crop.resize((round(crop.width * scale), round(crop.height * scale)), Image.LANCZOS) if scale < 1 else crop
+    if scale >= 1:
+        return Crop(crop, origin, 1.0)
+    return Crop(crop.resize((round(crop.width * scale), round(crop.height * scale)), Image.LANCZOS), origin, scale)
 
 
 def busy_matte(rgb: np.ndarray, u2net: Path) -> np.ndarray:
@@ -129,20 +143,25 @@ def turned(rgba: np.ndarray, turn: str) -> np.ndarray:
     return np.rot90(rgba, quarters)
 
 
-def cut_out(source: Path, u2net: Path | None, turn: str) -> np.ndarray:
-    """The figure, cut out, its edge cleaned, cropped and stood upright: RGBA float."""
+def cut_out(source: Path, u2net: Path | None, turn: str, lenses: Sequence[Lens] = ()) -> np.ndarray:
+    """The figure, cut out, its edge cleaned, cropped and stood upright: RGBA float. `lenses` (in the photo's
+    pixels, the right way up) are the far lenses of glasses the cut left out, drawn back behind the figure."""
     picture = load(source)
     pixels = np.asarray(picture)
     if is_plain(pixels):
         rgb = pixels.astype(float)
         alpha = plain_matte(rgb, u2net)
         colour = unmix(rgb, alpha, background_beside(rgb, alpha))
+        origin, scale = (0.0, 0.0), 1.0
     elif u2net is None:
         raise SystemExit("the picture's background is not plain: pass --u2net PATH to the u2net model")
     else:
-        rgb = np.asarray(subject_crop(picture, u2net), float)
+        crop = subject_crop(picture, u2net)
+        rgb, origin, scale = np.asarray(crop.picture, float), crop.origin, crop.scale
         alpha = busy_matte(rgb, u2net)
         colour = foreground_beside(rgb, alpha)
+    for lens in lenses:
+        colour, alpha = drawn_lens(colour, alpha, rgb, lens.moved(origin, scale))
     ys, xs = np.nonzero(alpha > EDGE)
     cut = np.concatenate([colour, alpha[..., None] * 255], axis=-1)[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
     return turned(cut, turn)
@@ -186,12 +205,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("out", type=Path, help="where the four pictures go (assets/figurine)")
     parser.add_argument("--turn", choices=["auto", *TURNS], default="auto", help="stand the figure upright (default: auto)")
     parser.add_argument("--u2net", type=Path, help="the u2net .onnx model: needed for a photo without a plain background")
+    parser.add_argument("--lens", type=parse_lens, action="append", default=[], metavar="X,Y,A,B,DEG",
+                        help="a far lens of glasses the cut leaves out (it shows the background through it), to draw back: "
+                             "its centre and semi-axes in the photo's pixels, the right way up, and its long axis's tilt in degrees")
     args = parser.parse_args(argv)
     if not args.chosen.exists():
         parser.error(f"no such picture: {args.chosen}")
     args.out.mkdir(parents=True, exist_ok=True)
 
-    figure = place(cut_out(args.chosen, args.u2net, args.turn))
+    figure = place(cut_out(args.chosen, args.u2net, args.turn, args.lens))
     level = figure_level(figure[..., 3] / 255, figure[..., :3])
     film, film_level = bag(figure.shape[1::-1], figure[..., 3], level, px=PX, figure_height=HEIGHT, clearance=CLEARANCE,
                            keep_off=head_room(figure[..., 3] / 255))

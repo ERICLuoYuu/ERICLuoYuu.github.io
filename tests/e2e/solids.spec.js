@@ -3,6 +3,7 @@ import { openSite, waitForState } from './helpers.js';
 import {
   clothesOf, waitForSettled, pointOn, dragMouse, pixelAt,
 } from './clothes-helpers.js';
+import { FIGURINE } from '../../js/scene/geometry.js';
 
 const IDS = ['figurine', 'sushi', 'fries', 'strawberries', 'bowl', 'dumplings'];
 
@@ -86,12 +87,9 @@ test("the figurine's clear bag does not grey the photo's shadows", async ({ page
   expect(lift, 'how far the bag lifts the darkest parts, on average').toBeLessThan(20);
 });
 
-test("the figurine's head is drawn with all the fine light and dark its photo has at that size", async ({ page }) => {
-  await openSite(page, '?jump=overhead');
-  await waitForState(page, 'overhead');
-  await waitForSettled(page);
-  // The head, the figure's top fifth: its box in the picture and where it is drawn on screen (css px).
-  const { head, screen } = await page.evaluate(async () => {
+/** The head, the figure's top fifth: its box in the picture (px) and where it is drawn on screen (css px). */
+function headOnScreen(page) {
+  return page.evaluate(async () => {
     const img = new Image();
     img.src = 'assets/figurine/figurine.webp';
     await img.decode();
@@ -115,8 +113,15 @@ test("the figurine's head is drawn with all the fine light and dark its photo ha
         if (px >= box[0] && px <= box[2] && py >= box[1] && py <= box[3]) [sx0, sy0, sx1, sy1] = [Math.min(sx0, x), Math.min(sy0, y), Math.max(sx1, x), Math.max(sy1, y)];
       }
     }
-    return { head: box, screen: [sx0, sy0, sx1 + 1, sy1 + 1] };
+    return { head: box, screen: [sx0, sy0, sx1 + 1, sy1 + 1], pictureWidth: width };
   });
+}
+
+test("the figurine's head is drawn with all the fine light and dark its photo has at that size", async ({ page }) => {
+  await openSite(page, '?jump=overhead');
+  await waitForState(page, 'overhead');
+  await waitForSettled(page);
+  const { head, screen } = await headOnScreen(page);
   // Fine light and dark: the spread of the brightness less its blur, over the figure (away from its outline),
   // as the canvas draws it (at its own resolution, before the browser scales it to the screen) and in the photo
   // scaled down to the same size as finely as the browser can.
@@ -155,6 +160,49 @@ test("the figurine's head is drawn with all the fine light and dark its photo ha
     return spread(a) / spread(b);
   }, { box: head, rect: [screen[0], screen[1], screen[2] - screen[0], screen[3] - screen[1]] });
   expect(ratio, "the head's fine light and dark, drawn, against its photo's at that size").toBeGreaterThan(1);
+});
+
+test("the box floor right beside the figurine's face is shaded, so its pale edge stands out from the pale floor", async ({ page }) => {
+  await openSite(page, '?jump=overhead');
+  await waitForState(page, 'overhead');
+  await waitForSettled(page);
+  // Sunlit skin is about as bright as the box floor, so without a shadow beside it the profile of a face turned
+  // away, and its nose, melt into the floor. The doll's contact shadow darkens the floor just past its outline
+  // and is gone a few units further out. How dark, from the canvas: its alpha less the bag film's faint light.
+  const { head, screen, pictureWidth } = await headOnScreen(page);
+  const { near, far } = await page.evaluate(({ head, screen, pxPerUnit }) => {
+    const UNIT = ((screen[2] - screen[0]) / (head[2] - head[0])) * pxPerUnit; // css px a unit
+    const pad = 8 * UNIT;
+    const drawn = window.__parcel.region(screen[0] - pad, screen[1] - pad, screen[2] - screen[0] + 2 * pad, screen[3] - screen[1] + 2 * pad);
+    const { width: w, height: h, data } = drawn;
+    const unit = UNIT * (w / (screen[2] - screen[0] + 2 * pad)); // canvas px a unit
+    const solid = (x, y) => data[4 * (y * w + x) + 3] > 250;
+    const reach = Math.ceil(7 * unit);
+    const shades = { near: [], far: [] };
+    for (let y = 0; y < h; y += 1) {
+      for (let x = 0; x < w; x += 1) {
+        if (solid(x, y)) continue;
+        let d2 = Infinity;
+        for (let dy = -reach; dy <= reach; dy += 1) {
+          for (let dx = -reach; dx <= reach; dx += 1) {
+            const [u, v] = [x + dx, y + dy];
+            if (u >= 0 && v >= 0 && u < w && v < h && dx * dx + dy * dy < d2 && solid(u, v)) d2 = dx * dx + dy * dy;
+          }
+        }
+        const d = Math.sqrt(d2) / unit;
+        const i = 4 * (y * w + x);
+        const shade = (data[i + 3] - (0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2])) / 255;
+        if (d > 1 && d <= 2) shades.near.push(shade);
+        if (d > 5 && d <= 7) shades.far.push(shade);
+      }
+    }
+    const median = (v) => v.sort((a, b) => a - b)[Math.floor(v.length / 2)];
+    return { near: median(shades.near), far: median(shades.far) };
+  }, { head, screen, pxPerUnit: pictureWidth / FIGURINE.footprint[0] });
+  // (within a unit lies the outline's own antialiased edge; a slight shadow there, as before, darkened the floor
+  // one to two units out by some 0.03)
+  expect(near - far, 'the floor one to two units past the outline, darker than five to seven units out').toBeGreaterThan(0.08);
+  expect(far, 'five to seven units out the floor is bare: no grey cloud round the doll').toBeLessThan(0.03);
 });
 
 test('without WebGL2 the figurine and the food lie still as pictures, fully visible', async ({ page }) => {
