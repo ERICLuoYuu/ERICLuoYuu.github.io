@@ -43,3 +43,19 @@ def test_the_brands_are_gone():
             assert yellow < 0.01, f"{item['id']}: {yellow:.3f} yellow"
             if item["id"] == "strawberries":  # a blank paper label: no dark print left (the fries' red would count as dark)
                 assert ((0.299 * r + 0.587 * g + 0.114 * b) < 90).mean() < 0.01
+
+
+def test_the_sushi_tray_is_a_box_with_a_level_top_and_a_rim_alike_on_all_four_sides():
+    level = np.asarray(Image.open(FOOD / "sushi-relief.webp").convert("L"), float)
+    solid = np.asarray(Image.open(FOOD / "sushi.webp").getchannel("A")) > 127
+    rows, cols = np.nonzero(solid)
+    top, bottom, left, right = rows.min(), rows.max(), cols.min(), cols.max()
+    mid_y, mid_x = (top + bottom) // 2, (left + right) // 2
+    level_top = np.median(level[top + 40:bottom - 40, left + 40:right - 40])
+    rim = prepare_food.ITEMS["sushi"].rim * prepare_food.PX
+    inward = {"left": level[mid_y, left + rim + 4], "right": level[mid_y, right - rim - 4],
+              "top": level[top + rim + 4, mid_x], "bottom": level[bottom - rim - 4, mid_x]}
+    edge = {"left": level[mid_y, left], "right": level[mid_y, right], "top": level[top, mid_x], "bottom": level[bottom, mid_x]}
+    for side in inward:
+        assert inward[side] > level_top - 30, f"{side}: {inward[side]:.0f} just past the rim, the top is {level_top:.0f}"
+        assert edge[side] < level_top - 60, f"{side}: {edge[side]:.0f} on the edge: the rim rises from the box floor"

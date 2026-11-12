@@ -140,3 +140,21 @@ def test_sharpening_steepens_a_step_inside_the_figure_and_leaves_its_flat_colour
     assert abs(out[30, 15, 0] - 100) < 1 and abs(out[30, 45, 0] - 150) < 1, "the flat colour away from the step is as it was"
     assert abs(out[12, 20, 0] - 100) < 1, "nor does the figure's edge change: the empty surround is not blurred in"
     assert rgb[30, 28, 0] == 100, "the input is not changed"
+
+
+def test_a_shape_that_fills_its_picture_s_width_rises_from_its_sides_as_from_its_ends():
+    tray = np.zeros((100, 60)); tray[10:90, :] = 1  # a tray fitted to its footprint's width: its sides on the picture's edge
+    grey = np.full((100, 60, 3), 150.0)
+    level = relief(tray, grey, radius_px=20, detail=0.0).astype(int)
+    assert abs(level[50, 3] - level[13, 30]) <= 2, f"3 px in: {level[50, 3]} from its side, {level[13, 30]} from its end"
+    assert level[50, 0] < 128, "beyond the picture's edge is outside it: its side starts low, as its ends do"
+
+
+def test_a_box_s_rim_keeps_the_scale_of_its_fine_detail():
+    yy, xx = np.mgrid[0:120, 0:120]
+    box = ((xx >= 10) & (xx < 110) & (yy >= 10) & (yy < 110)).astype(float)
+    pattern = 150.0 + 40 * np.sin(xx / 4.0)[..., None] * np.ones(3)  # detail some 25 px across
+    dome = relief(box, pattern, radius_px=30, detail=0.15).astype(int)
+    rim = relief(box, pattern, radius_px=6, detail=0.15, detail_px=5.0).astype(int)
+    middle = np.s_[40:80, 40:80]  # where both are at full height
+    assert np.abs(rim[middle] - dome[middle]).max() <= 2, "the same detail on a box's level top as on a dome's"

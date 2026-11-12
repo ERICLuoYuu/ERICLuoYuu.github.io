@@ -8,7 +8,8 @@ chopsticks' wrapper), cut the food out of its plain background (a colour key,
 the alpha it already has, or the tray's rounded outline where the sushi tray
 fills its photo edge to edge), match it
 to the box's light, add the scene's grain and fit it to its footprint at PX
-pixels a unit. Writes <id>.webp, <id>-relief.webp (a gentle dome of its shape
+pixels a unit. Writes <id>.webp, <id>-relief.webp (a gentle dome of its shape, or a
+box's level top with a rounded rim (the sushi tray),
 for the WebGL heightfield) and food.json (id, label, size in units, peak
 height, the pictures, and the cleaned boxes in output pixels).
 
@@ -36,6 +37,7 @@ ROOT = Path(__file__).resolve().parent.parent
 GRAIN = ROOT / "assets" / "textures" / "grain.png"
 PX = 4  # pixels a parcel unit
 DOME = 0.3  # the dome reaches full height this share of the smaller side in
+RIM_SMOOTH = 1.0  # units: a box's rim softened, so its edge shades as no crease
 EDGE = 0.02  # alpha below this is empty when cropping
 MARK_RING = 3  # px of the surround a mark is painted over from: the label's paper border is only 4-5 px
 TRAY = {"radius": 0.08, "inset": 0.004, "feather": 2.0}  # the sushi tray's outline, as shares of its photo's width
@@ -48,11 +50,13 @@ class Item(NamedTuple):
     height: int  # peak height in units
     label: str
     marks: tuple[tuple[int, int, int, int], ...]  # (x0, y0, x1, y1) boxes in source pixels, painted over
+    rim: float = 0.0  # units: a box (level top) whose rounded rim is this wide; 0: a dome over DOME of its smaller side
 
 
 ITEMS: dict[str, Item] = {
     # the chopsticks' paper wrapper is printed with two characters
-    "sushi": Item("food-sushi.jpg", "tray", (52, 68), 12, "sushi", ((448, 843, 508, 897), (476, 896, 532, 970))),
+    # a plastic tray: a box with a level top, not a dome (a dome sank its edges and bowed its outline in perspective)
+    "sushi": Item("food-sushi.jpg", "tray", (52, 68), 12, "sushi", ((448, 843, 508, 897), (476, 896, 532, 970)), rim=3),
     # the "M" and its registered mark on the packet's red panel
     "fries": Item("food-fries.jpg", "auto", (32, 40), 22, "fries", ((429, 552, 589, 699),)),
     # the shop's label (x 182-400, y 188-423), its text and its drawing: blank paper, filled from its border
@@ -103,7 +107,9 @@ def prepare(item_id: str, item: Item, source: Path, out: Path, grain: np.ndarray
     fitted = fit_canvas(np.round(np.clip(cut, 0, 255)).astype(np.uint8), size_px)
     a = fitted[..., 3] / 255
     finished = add_grain(match_light(fitted[..., :3], a), a, grain)
-    level = relief(a, finished, radius_px=DOME * min(size_px))
+    dome_px = DOME * min(size_px)
+    shape = {"radius_px": item.rim * PX, "smooth_px": RIM_SMOOTH * PX} if item.rim else {"radius_px": dome_px}
+    level = relief(a, finished, detail_px=dome_px / 6, **shape)  # a box's top keeps a dome's detail
     texture, height_map = out / f"{item_id}.webp", out / f"{item_id}-relief.webp"
     picture = np.concatenate([finished, fitted[..., 3:4]], axis=-1)
     Image.fromarray(np.round(picture).astype(np.uint8), "RGBA").save(texture, "WEBP", quality=88, alpha_quality=100, method=6)
