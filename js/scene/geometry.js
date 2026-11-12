@@ -43,7 +43,7 @@ export const BOOKS = Object.freeze([
  * round things; `keepIn` keeps a body inside the walls when it is dragged.
  */
 export const FIGURINE = Object.freeze({
-  id: 'figurine', label: 'figurine', footprint: [125, 290], height: 30, start: [68.5, 150], rotate: 0, inset: 0.04, keepIn: true,
+  id: 'figurine', label: 'figurine', footprint: [125, 290], height: 15, start: [68.5, 150], rotate: 0, inset: 0.04, keepIn: true,
 });
 export const FOOD = Object.freeze([
   Object.freeze({ id: 'sushi', label: 'sushi', footprint: [52, 68], height: 12, start: [170, 56], rotate: 0, inset: 0, keepIn: false }),

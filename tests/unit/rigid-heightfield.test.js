@@ -48,7 +48,7 @@ test('a point on the picture is found on the body\'s top, where picking would hi
   const body = withPosition({ ...createBody(FIGURINE), rotate: 90 }, [100, 150, 6]);
   const relief = (u, v) => (u > 0.5 ? 1 : 0.5);
   const top = surfacePoint(body, relief, [0.75, 0.25]);
-  assert.deepEqual(top.map((c) => Math.round(c * 1000) / 1000), [172.5, 181.25, 36]);
+  assert.deepEqual(top.map((c) => Math.round(c * 1000) / 1000), [172.5, 181.25, 6 + FIGURINE.height]);
   const hit = pickBody({ origin: [top[0], top[1], 500], dir: [0, 0, -1] }, body, { alpha: () => 1, relief });
   assert.ok(Math.abs(hit.point[2] - top[2]) < 0.5 && Math.abs(hit.uv[0] - 0.75) < 1e-6 && Math.abs(hit.uv[1] - 0.25) < 1e-6);
 });

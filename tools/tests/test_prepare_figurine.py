@@ -10,10 +10,13 @@ import prepare_figurine as pf
 RED = (180.0, 40.0, 40.0)
 
 
-def figure_png(tmp_path):
+LILAC = (150.0, 90.0, 200.0)  # much blue: the box's warm tint would take some 14 levels of it
+
+
+def figure_png(tmp_path, colour=(180, 40, 40)):
     yy, xx = np.mgrid[0:400, 0:900]
     inside = ((xx - 450) / 400) ** 2 + ((yy - 200) / 120) ** 2 <= 1
-    rgb = np.where(inside[..., None], (180, 40, 40), (200, 200, 200)).astype(np.uint8)
+    rgb = np.where(inside[..., None], colour, (200, 200, 200)).astype(np.uint8)
     path = tmp_path / "chosen.png"
     Image.fromarray(rgb).save(path)
     return path
@@ -114,7 +117,17 @@ def test_a_large_photo_is_cut_at_a_working_size(tmp_path, monkeypatch):
     assert abs(cut.shape[0] - pf.WORK_LENGTH) <= 0.03 * pf.WORK_LENGTH, f"the figure is {cut.shape[0]} px long"
 
 
-def test_the_figure_s_height_is_a_smooth_dome_without_the_photo_s_texture():
+def test_the_figure_s_top_is_level_but_for_its_rounded_edge_so_a_face_near_the_outline_is_not_sunk():
+    yy, xx = np.mgrid[0:200, 0:200]
+    head = (np.hypot(xx - 100, yy - 100) < 60).astype(float)  # 15 units across its radius
+    level = pf.figure_level(head, np.full((200, 200, 3), 150.0)).astype(float)
+    row = level[100]
+    unit = pf.PX
+    assert row[40 + 6 * unit] >= 0.97 * level.max(), f"6 units in from the outline the top is at {row[40 + 6 * unit]:.0f} of {level.max():.0f}"
+    assert row[40 + unit] < 0.8 * level.max(), f"1 unit in it is already at {row[40 + unit]:.0f} of {level.max():.0f}: a cliff, not a rounded edge"
+
+
+def test_the_figure_s_height_is_smooth_without_the_photo_s_texture():
     a = FIGURE.astype(float)
     flat = np.full(FIGURE.shape + (3,), 150.0)
     striped = flat * (1 + 0.4 * (np.arange(FIGURE.shape[0]) // 4 % 2))[:, None, None]  # skin texture, grass blades
@@ -126,9 +139,18 @@ def made(tmp_path_factory):
     """The four pictures, made once for the module (encoding them takes seconds)."""
     tmp_path = tmp_path_factory.mktemp("figurine")
     out = tmp_path / "out"
-    assert pf.main([str(figure_png(tmp_path)), str(out)]) == 0
+    assert pf.main([str(figure_png(tmp_path, LILAC)), str(out)]) == 0
     load = lambda name: np.asarray(Image.open(out / name))  # noqa: E731
     return load("figurine.webp"), load("figurine-relief.webp"), load("wrap.webp"), load("wrap-relief.webp")
+
+
+def test_the_figure_keeps_its_photo_s_own_colours_without_tint_or_grain(made):
+    figure, *_ = made
+    inside = ndimage.binary_erosion(figure[..., 3] == 255, iterations=8)
+    colours = figure[..., :3][inside].astype(float)
+    off = np.abs(colours.mean(axis=0) - LILAC).max()
+    assert off < 3, f"the figure's lilac is {off:.1f} levels off the photo's: tinted"
+    assert colours.std(axis=0).max() < 0.3, f"the flat lilac varies by {colours.std(axis=0).max():.2f} levels: grain on it"
 
 
 def test_a_wide_figure_is_turned_upright_and_sized_to_the_figure_the_clothes_fit(made):

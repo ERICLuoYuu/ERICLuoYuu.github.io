@@ -7,9 +7,10 @@ u2net model's outline when it is given); on a busy one, such as a photo of the o
 grass, the model's outline pulled onto the photo's own edges, which take the subject's
 own colour. Phone photos are turned the right way up first. Stand its long side upright, size it to
 the figure the clothes were fitted to (FIGURE_LENGTH from head to sole) or
-smaller if the bag's margins need it, match it to the box's light, add the
-scene's grain and centre it on the figurine's footprint at PX pixels a unit.
-Then wrap it: a crinkled clear bag with crimped seals lying over it.
+smaller if the bag's margins need it and centre it on the figurine's footprint
+at PX pixels a unit, in the photo's own colours: its sunlight and shadows are
+what make it look solid. Raise it into a slab with a level top and a rounded
+edge, then wrap it: a crinkled clear bag with crimped seals lying over it.
 
 Writes figurine.webp, figurine-relief.webp (the WebGL heightfield's height,
 255 = HEIGHT), wrap.webp and wrap-relief.webp (255 = HEIGHT + CLEARANCE),
@@ -38,21 +39,19 @@ from solids.cutout import (  # noqa: E402
     unmix,
     without_specks,
 )
-from solids.finish import add_grain, fit_canvas, match_light  # noqa: E402
+from solids.finish import fit_canvas  # noqa: E402
 from solids.relief import relief  # noqa: E402
 from solids.wrap import bag  # noqa: E402
 
-ROOT = Path(__file__).resolve().parent.parent
-GRAIN = ROOT / "assets" / "textures" / "grain.png"
 SIZE = (125, 290)  # units: FIGURINE.footprint in js/scene/geometry.js
 PX = 4  # pixels a parcel unit
-HEIGHT = 30  # units: FIGURINE.height
+HEIGHT = 15  # units: FIGURINE.height (thicker, the slab's side shows, stretched, and its shadow is heavy)
 CLEARANCE = 2  # units the bag lies over the figure
 FIGURE_LENGTH = 248  # units from head to sole, as clothes/fit.py measures the figure
 MARGIN = (8, 16)  # units between the figure and the bag's sides, and its ends (with the seals)
-RELIEF_RADIUS = 12  # units: the figure's dome reaches full height this far in
-RELIEF_DETAIL = 0.0  # a smooth dome: a photo's own texture (skin, grass blades) would shade as grooves
-RELIEF_SMOOTH = 3  # units: the dome rounded so an arm or a leg is round, not ridged down its middle
+RELIEF_RADIUS = 4  # units: the edge rounds up to the level top this far in (a deeper dome sinks a face near the outline)
+RELIEF_DETAIL = 0.0  # a smooth top: a photo's own texture (skin, grass blades) would shade as grooves
+RELIEF_SMOOTH = 1.5  # units: the edge's rounding softened, so it is no ridge or crease
 PLAIN = 12.0  # a border whose colour varies more than this (std) is not plain: use u2net
 SHADES = (0.3, 1.1)  # the backdrop's grey from its contact shadows (this share of it) to where its light is brightest
 TOLERANCE = 14.0  # colour distance from those shades still counted as backdrop (a generated backdrop keeps within ~7)
@@ -155,7 +154,7 @@ def place(cut: np.ndarray) -> np.ndarray:
 
 
 def figure_level(alpha: np.ndarray, rgb: np.ndarray) -> np.ndarray:
-    """The figure's height map (uint8, 255 = HEIGHT): a smooth, rounded dome inflated from its outline."""
+    """The figure's height map (uint8, 255 = HEIGHT): a slab with a level top, its edge rounded over RELIEF_RADIUS."""
     return relief(alpha, rgb, radius_px=RELIEF_RADIUS * PX, detail=RELIEF_DETAIL, smooth_px=RELIEF_SMOOTH * PX)
 
 
@@ -171,14 +170,10 @@ def main(argv: list[str] | None = None) -> int:
     args.out.mkdir(parents=True, exist_ok=True)
 
     figure = place(cut_out(args.chosen, args.u2net, args.turn))
-    a = figure[..., 3] / 255
-    grain = np.asarray(Image.open(GRAIN).convert("RGBA"), float)
-    finished = add_grain(match_light(figure[..., :3], a), a, grain)
-    level = figure_level(a, finished)
+    level = figure_level(figure[..., 3] / 255, figure[..., :3])
     film, film_level = bag(figure.shape[1::-1], figure[..., 3], level, px=PX, figure_height=HEIGHT, clearance=CLEARANCE)
 
-    picture = np.concatenate([finished, figure[..., 3:4]], axis=-1)
-    Image.fromarray(np.round(picture).astype(np.uint8), "RGBA").save(args.out / "figurine.webp", "WEBP", quality=88, alpha_quality=100, method=6)
+    Image.fromarray(figure, "RGBA").save(args.out / "figurine.webp", "WEBP", quality=88, alpha_quality=100, method=6)
     Image.fromarray(level, "L").save(args.out / "figurine-relief.webp", "WEBP", quality=90, method=6)
     Image.fromarray(film, "RGBA").save(args.out / "wrap.webp", "WEBP", quality=88, alpha_quality=100, method=6)
     Image.fromarray(np.round(film_level * 255).astype(np.uint8), "L").save(args.out / "wrap-relief.webp", "WEBP", quality=90, method=6)

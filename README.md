@@ -110,10 +110,11 @@ whatever lies beneath: the floor, a book, the clothes, another piece. The
 figurine stays inside the box; the food may go anywhere, even out onto the
 flaps or the table.
 
-**The figurine.** It is your own photo, cut out and finished by a tool, the
-same way the food is: its outline is inflated into a smooth dome for the
-3D surface and shaded halfway by the scene's light (the photo's own sunlight
-does the rest).
+**The figurine.** It is your own photo, cut out by a tool and raised into a
+thin slab with a level top and a rounded edge. It keeps the photo's own
+colours and light: its sunlight and shadows are what make it look solid, so
+the scene neither shades it again nor lays a shadow or a gloss over it. It
+still casts its shadow on the box, and its clear bag still glints.
 
 1. Take or pick a photo of yourself, the whole of you in frame, seen from a
    little above (sitting or lying works best: you will lie in the box).

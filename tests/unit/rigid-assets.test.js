@@ -20,7 +20,7 @@ test("the figurine's pictures are its footprint at 4 px a unit", async () => {
   for (const name of ['figurine', 'figurine-relief', 'wrap', 'wrap-relief']) {
     assert.deepEqual(webpSize(await readFile(new URL(`../../assets/figurine/${name}.webp`, import.meta.url))), FIGURINE.footprint.map((u) => u * 4));
   }
-  assert.equal(FIGURINE.height, 30, 'prepare_figurine.HEIGHT');
+  assert.equal(FIGURINE.height, 15, 'prepare_figurine.HEIGHT');
 });
 
 test('the figurine and food pictures together stay within their budget', async () => {

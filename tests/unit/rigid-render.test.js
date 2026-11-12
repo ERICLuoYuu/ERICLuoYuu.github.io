@@ -17,10 +17,12 @@ function parts() {
   }, (image) => image);
 }
 
-test("the figurine is shaded halfway: rounder than its photo alone, not lit over again like the food", () => {
+test("the figurine shows its photo's own light: not lit over again, nor shadowed on itself, unlike the food", () => {
   const [figurine, food] = parts();
-  assert.ok(figurine.relight >= 0.4 && figurine.relight <= 0.6, `the scene relights the figurine's photo ${figurine.relight}`);
-  assert.ok(figurine.sheen < food.sheen, 'matte: less gloss than the food');
+  assert.equal(figurine.relight, 0, "the photo's sunlight is its shading");
+  assert.equal(figurine.shadowed, false, 'the photo already has its shadows');
   assert.equal(food.relight, 1);
+  assert.equal(food.shadowed, true);
+  assert.equal(figurine.sheen, 0, 'on its level top a gloss is no highlight, only a veil over the whole photo');
   assert.equal(figurine.wrap.sheen > figurine.sheen, true, 'its clear bag still glints');
 });
