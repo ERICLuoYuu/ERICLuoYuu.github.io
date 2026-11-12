@@ -28,6 +28,9 @@ export function createBookView({ mount, measureHost, ui, text, sound, reducedMot
   let layout = null;
   let flip = null;
   let contentCount = 0;
+  // The book's loaded drawings, held for good: the browser keeps a picture ready (sized the moment a new <img>
+  // shows it) only while something holds it, and pages are measured with fresh <img>s long after loading.
+  let drawings = [];
   const listeners = { flip: new Set() };
 
   async function load(source) {
@@ -36,7 +39,7 @@ export function createBookView({ mount, measureHost, ui, text, sound, reducedMot
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       sections = tagBlocks(parseBook(await res.text()).sections);
       const images = sections.flat().filter((b) => b.type === 'image');
-      await Promise.all(images.map((b) => loadImage(b.src).catch((err) => console.warn('[parcel] book image:', err.message))));
+      drawings = await Promise.all(images.map((b) => loadImage(b.src).catch((err) => console.warn('[parcel] book image:', err.message))));
     } catch (err) {
       console.error(`[parcel] could not read the book (${source}):`, err.message);
       sections = tagBlocks([[{ type: 'paragraph', html: 'This book could not be opened right now. Please try again later.' }]]);
