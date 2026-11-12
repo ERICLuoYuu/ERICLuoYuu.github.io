@@ -31,8 +31,9 @@ Everything you are meant to change lives in **`content/`** and **`assets/`**.
 ### 1. The introduction booklet — `content/book.md`
 
 The booklet looks like a black-and-white assembly manual: numbered steps,
-line drawings, a parts list, plain type. Every `[Placeholder — …]` in the file
-is waiting for your own words. A quick reference sits at the top of the file:
+line drawings, a parts list, plain type. Its text is the owner's "XY-2005 Human
+User Manual" (version 1.0), one numbered step per section. A quick reference
+sits at the top of the file:
 
 ```markdown
 # Page title                   (not numbered)
@@ -238,7 +239,7 @@ book's `alt` text in `content/site.js` is what screen readers say.
 
 ### Still needed from you
 
-- [ ] The booklet text in `content/book.md`, the cover title (`bookTitle`) and `ownerName`
+- [x] The booklet text in `content/book.md`, the cover title (`bookTitle`) and `ownerName`
 - [ ] Check and reword the figurine's and the food's `alt` descriptions (`figurine.alt`, `food[].alt`)
 - [ ] Artwork: `questionMark` (and optionally `instruction`) — the box, booklet, food, books and desiccant are done
 - [ ] Your handwriting (font or images), if you want it instead of Caveat
