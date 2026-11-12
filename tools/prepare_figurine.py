@@ -10,7 +10,8 @@ the figure the clothes were fitted to (FIGURE_LENGTH from head to sole) or
 smaller if the bag's margins need it and centre it on the figurine's footprint
 at PX pixels a unit, in the photo's own colours: its sunlight and shadows are
 what make it look solid. Raise it into a slab with a level top and a rounded
-edge, then wrap it: a crinkled clear bag with crimped seals lying over it.
+edge, then wrap it: a crinkled clear bag with crimped seals lying over it, its
+creases kept off the head so that no glint crosses the face.
 
 Writes figurine.webp, figurine-relief.webp (the WebGL heightfield's height,
 255 = HEIGHT), wrap.webp and wrap-relief.webp (255 = HEIGHT + CLEARANCE),
@@ -49,6 +50,8 @@ HEIGHT = 15  # units: FIGURINE.height (thicker, the slab's side shows, stretched
 CLEARANCE = 2  # units the bag lies over the figure
 FIGURE_LENGTH = 248  # units from head to sole, as clothes/fit.py measures the figure
 MARGIN = (8, 16)  # units between the figure and the bag's sides, and its ends (with the seals)
+HEAD = 0.2  # share of the upright figure's length, from its top, that is its head
+HEAD_ROOM = 4  # units: the bag's creases keep this far off the head, and fade back in over as far again
 RELIEF_RADIUS = 4  # units: the edge rounds up to the level top this far in (a deeper dome sinks a face near the outline)
 RELIEF_DETAIL = 0.0  # a smooth top: a photo's own texture (skin, grass blades) would shade as grooves
 RELIEF_SMOOTH = 1.5  # units: the edge's rounding softened, so it is no ridge or crease
@@ -158,6 +161,16 @@ def figure_level(alpha: np.ndarray, rgb: np.ndarray) -> np.ndarray:
     return relief(alpha, rgb, radius_px=RELIEF_RADIUS * PX, detail=RELIEF_DETAIL, smooth_px=RELIEF_SMOOTH * PX)
 
 
+def head_room(alpha: np.ndarray) -> np.ndarray:
+    """Where the bag's creases keep off (0-1): the figure's head, the top HEAD of its length, and HEAD_ROOM
+    around it, fading out over HEAD_ROOM more."""
+    solid = np.asarray(alpha) > 0.5
+    ys, _ = np.nonzero(solid)
+    head = solid & (np.arange(solid.shape[0])[:, None] <= ys.min() + HEAD * (ys.max() - ys.min()))
+    room = HEAD_ROOM * PX
+    return np.clip(2 - ndimage.distance_transform_edt(~head) / room, 0, 1)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("chosen", type=Path, help="the owner's photo, or the figurine picture they chose")
@@ -171,7 +184,8 @@ def main(argv: list[str] | None = None) -> int:
 
     figure = place(cut_out(args.chosen, args.u2net, args.turn))
     level = figure_level(figure[..., 3] / 255, figure[..., :3])
-    film, film_level = bag(figure.shape[1::-1], figure[..., 3], level, px=PX, figure_height=HEIGHT, clearance=CLEARANCE)
+    film, film_level = bag(figure.shape[1::-1], figure[..., 3], level, px=PX, figure_height=HEIGHT, clearance=CLEARANCE,
+                           keep_off=head_room(figure[..., 3] / 255))
 
     Image.fromarray(figure, "RGBA").save(args.out / "figurine.webp", "WEBP", quality=88, alpha_quality=100, method=6)
     Image.fromarray(level, "L").save(args.out / "figurine-relief.webp", "WEBP", quality=90, method=6)

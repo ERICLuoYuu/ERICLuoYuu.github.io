@@ -171,8 +171,23 @@ def test_the_figure_lies_inside_the_bag_with_room_for_the_seals(made):
 def test_the_bag_is_clear_film_inside_its_outline_and_denser_at_the_seals(made):
     _, _, wrap, _ = made
     alpha = wrap[..., 3] / 255
-    assert alpha[0, 0] == 0 and alpha[580, 30] > 0.04 and alpha[580, 250] < 0.5
+    assert alpha[0, 0] == 0 and alpha[580, 30] > 0.015 and alpha[580, 250] < 0.5
     assert alpha[: 10 * pf.PX, 60:440].mean() > 1.5 * alpha[500:660, 60:440].mean()
+
+
+def test_the_bag_s_film_is_clear_over_the_figure_so_the_photo_s_shadows_stay_dark(made):
+    figure, _, wrap, _ = made
+    film = wrap[..., 3][figure[..., 3] > 127] / 255
+    assert np.median(film) <= 0.05, f"the film over the figure is {np.median(film):.2f} opaque: a milky veil"
+
+
+def test_the_bag_s_creases_keep_off_the_figure_s_head(made):
+    figure, _, wrap, _ = made
+    on = figure[..., 3] > 127
+    ys, _ = np.nonzero(on)
+    head = on & (np.arange(on.shape[0])[:, None] <= ys.min() + 0.2 * (ys.max() - ys.min()))  # its top fifth
+    assert wrap[..., 3][head].max() / 255 <= 0.06, f"a crease {wrap[..., 3][head].max() / 255:.2f} opaque crosses the face"
+    assert wrap[..., 3][on & ~head].max() / 255 > 0.15, "the rest of the bag still creases"
 
 
 def test_the_bag_lies_over_the_figure_everywhere(made):

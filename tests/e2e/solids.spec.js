@@ -18,14 +18,16 @@ test('the figurine and every food item are drawn and can be picked up', async ({
   }
 });
 
-test("the figurine is drawn in its photo's own light: not shaded over again, nor glossy", async ({ page }) => {
-  await openSite(page, '?jump=overhead');
-  await waitForState(page, 'overhead');
-  await waitForSettled(page);
-  // At points over the figurine, away from its cut edge (where drawn and picture points need not line up
-  // to the pixel): the brightness drawn, and its picture's at the same picture point.
-  const points = await page.evaluate(async () => {
+/**
+ * At a grid × grid of points over the figurine, away from its cut edge (where drawn and picture points need
+ * not line up to the pixel): the brightness drawn, its picture's at the same picture point, and whether the
+ * picture is dark (below DARK) all around it, within AROUND picture px.
+ */
+function sampleFigurine(page, grid) {
+  return page.evaluate(async (n) => {
     const EDGE = 4; // picture px
+    const AROUND = 4; // picture px
+    const DARK = 60;
     const lum = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
     const img = new Image();
     img.src = 'assets/figurine/figurine.webp';
@@ -35,26 +37,53 @@ test("the figurine is drawn in its photo's own light: not shaded over again, nor
     ctx.drawImage(img, 0, 0);
     const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const at = (px, py) => 4 * (Math.min(height - 1, Math.max(0, py)) * width + Math.min(width - 1, Math.max(0, px)));
+    const lumAt = (px, py) => lum([...data.slice(at(px, py), at(px, py) + 3)]);
     const inside = (px, py) => [[0, 0], [EDGE, 0], [-EDGE, 0], [0, EDGE], [0, -EDGE]].every(([dx, dy]) => data[at(px + dx, py + dy) + 3] > 250);
+    const darkAround = (px, py) => {
+      for (let dy = -AROUND; dy <= AROUND; dy += 1) {
+        for (let dx = -AROUND; dx <= AROUND; dx += 1) if (lumAt(px + dx, py + dy) >= DARK) return false;
+      }
+      return true;
+    };
     const box = window.__parcel.garmentBox('figurine');
     const found = [];
-    for (let j = 1; j < 30; j += 1) {
-      for (let i = 1; i < 30; i += 1) {
-        const [x, y] = [box.left + (box.width * i) / 30, box.top + (box.height * j) / 30];
+    for (let j = 1; j < n; j += 1) {
+      for (let i = 1; i < n; i += 1) {
+        const [x, y] = [box.left + (box.width * i) / n, box.top + (box.height * j) / n];
         const hit = window.__parcel.hit(x, y);
         const [px, py] = hit ? [Math.floor(hit.uv[0] * width), Math.floor(hit.uv[1] * height)] : [];
         const drawn = hit?.id === 'figurine' && inside(px, py) && window.__parcel.pixel(x, y);
-        if (drawn && drawn[3] > 250) found.push({ drawn: lum(drawn), picture: lum([...data.slice(at(px, py), at(px, py) + 3)]) });
+        if (drawn && drawn[3] > 250) found.push({ drawn: lum(drawn), picture: lumAt(px, py), darkAround: darkAround(px, py) });
       }
     }
     return found;
-  });
+  }, grid);
+}
+
+test("the figurine is drawn in its photo's own light: not shaded over again, nor glossy", async ({ page }) => {
+  await openSite(page, '?jump=overhead');
+  await waitForState(page, 'overhead');
+  await waitForSettled(page);
+  const points = await sampleFigurine(page, 30);
   expect(points.length, 'points on the figurine').toBeGreaterThan(120);
   const share = (list, test) => list.filter(test).length / list.length;
   expect(share(points, (p) => p.drawn < 0.7 * p.picture), 'drawn much darker than its picture').toBeLessThan(0.1);
   // the clear bag over it adds a little light everywhere: only where the picture is not dark can it not explain a lot
   const lit = points.filter((p) => p.picture >= 80);
   expect(share(lit, (p) => p.drawn > 1.4 * p.picture), 'drawn much brighter than its picture: glossy').toBeLessThan(0.1);
+});
+
+test("the figurine's clear bag does not grey the photo's shadows", async ({ page }) => {
+  await openSite(page, '?jump=overhead');
+  await waitForState(page, 'overhead');
+  await waitForSettled(page);
+  // Its shadows are what make the photo look solid. Where the photo is dark all around (its hair), a small
+  // screen's blur with brighter neighbours cannot lift what is drawn: only the bag over it can. Without the
+  // bag they are drawn as dark as the photo; a milky film lifted them by some 45 levels.
+  const dark = (await sampleFigurine(page, 80)).filter((p) => p.picture < 40 && p.darkAround);
+  expect(dark.length, 'points dark all around on the figurine').toBeGreaterThan(15);
+  const lift = dark.reduce((sum, p) => sum + p.drawn - p.picture, 0) / dark.length;
+  expect(lift, 'how far the bag lifts the darkest parts, on average').toBeLessThan(20);
 });
 
 test('without WebGL2 the figurine and the food lie still as pictures, fully visible', async ({ page }) => {

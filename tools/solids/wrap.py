@@ -1,8 +1,8 @@
 """The figurine's clear plastic bag: a picture and a height map. Returns new arrays.
 
 A pillow-shaped bag of thin film: its long sides bow out at the middle, its
-ends are crimped heat seals, the film is nearly clear inside but denser along
-its edges and wherever it creases. It is draped over the figure it holds, so
+ends are crimped heat seals, the film is clear inside but denser along its
+edges and wherever it creases. It is draped over the figure it holds, so
 its height lies a little over the figure's everywhere, with ridges along the
 creases.
 """
@@ -21,7 +21,7 @@ SEAL = 10  # units: how deep each crimped seal is
 SEAL_ALPHA = 0.5
 TOOTH = 2  # units: the depth of the saw-tooth at a seal's cut edge
 CRIMP = 2  # units between the seal's crimp ridges
-FILM = (0.08, 0.14)  # the clear film's alpha, varying gently
+FILM = (0.02, 0.04)  # the clear film's alpha, varying gently (a milkier film greys the photo's shadows, flattening it)
 EDGE_ALPHA = 0.35  # along the bag's edge
 EDGE_FADE = 3  # units over which the edge's density fades into the film
 CREASES = 14
@@ -68,11 +68,14 @@ def _creases(size_px: tuple[int, int], px: int, rng: np.random.Generator) -> tup
 
 
 def bag(size_px: tuple[int, int], figure_alpha: np.ndarray, figure_level: np.ndarray, seed: str = "wrap",
-        *, px: int = 4, figure_height: float = 30, clearance: float = 2) -> tuple[np.ndarray, np.ndarray]:
+        *, px: int = 4, figure_height: float = 30, clearance: float = 2,
+        keep_off: np.ndarray | None = None) -> tuple[np.ndarray, np.ndarray]:
     """The bag over a figure: (RGBA uint8 picture, height in [0, 1] of figure_height + clearance).
 
     `figure_alpha` (0-255 or 0-1) and `figure_level` (uint8 relief, 255 = figure_height)
-    are the figure's pictures on the same canvas.
+    are the figure's pictures on the same canvas. `keep_off` (0-1, the same canvas)
+    is where the creases fade out, such as over the figure's face, so that their
+    glints do not cross it.
     """
     w, h = size_px
     rng = _rng(seed)
@@ -86,6 +89,9 @@ def bag(size_px: tuple[int, int], figure_alpha: np.ndarray, figure_level: np.nda
     film = FILM[0] + (FILM[1] - FILM[0]) * noise
     edge = EDGE_ALPHA * np.exp(-inward / (EDGE_FADE * px))
     crease_alpha, ridge = _creases(size_px, px, rng)
+    if keep_off is not None:
+        room = 1 - np.clip(np.asarray(keep_off, float), 0, 1)
+        crease_alpha, ridge = crease_alpha * room, ridge * room
     alpha = np.maximum.reduce([film, edge, crease_alpha])
 
     ys, xs = np.mgrid[0:h, 0:w].astype(float)

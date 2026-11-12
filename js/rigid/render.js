@@ -32,6 +32,9 @@ const FINISH = {
 };
 const PX = 4; // pixels a unit in the bodies' pictures
 const DETAIL = 0.2; // share of the relief map's slope added on top of the heightfield's own shading
+// share of a crease's glint that the bag's flat film catches: clear film hardly glints, and a broad sheen
+// over it greys the photo's shadows beneath
+const FLAT_GLINT = 0.03;
 const CONTACT = { grow: 1.5, growPerLift: 0.25, above: 0.15, alpha: 0.55, fade: 15 };
 const DARK_GLSL = `vec3(${DARK.map((c) => c.toFixed(4)).join(', ')})`;
 
@@ -123,7 +126,7 @@ void main() {
   float sun = sunlit(vShadow);
   float shade = max(0.0, dot(n, uLightDir)) * 0.5 + 0.5;
   // creases and edges, where the film is denser, catch the light; flat film hardly glints
-  float crease = mix(0.12, 1.0, smoothstep(0.12, 0.35, tex.a));
+  float crease = mix(${FLAT_GLINT.toFixed(2)}, 1.0, smoothstep(0.12, 0.35, tex.a));
   float glint = pow(max(0.0, dot(n, normalize(uLightDir + toEye))), uPower) * uSheen * sun * uLightLevel * crease;
   vec3 color = mix(base * shade, ${DARK_GLSL}, (1.0 - uLightLevel) * 0.95);
   outColor = vec4(min(color * tex.a + glint, vec3(1.0)), clamp(tex.a + glint * 0.6, 0.0, 1.0));

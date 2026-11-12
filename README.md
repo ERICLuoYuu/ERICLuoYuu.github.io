@@ -114,7 +114,9 @@ flaps or the table.
 thin slab with a level top and a rounded edge. It keeps the photo's own
 colours and light: its sunlight and shadows are what make it look solid, so
 the scene neither shades it again nor lays a shadow or a gloss over it. It
-still casts its shadow on the box, and its clear bag still glints.
+still casts its shadow on the box. Its bag is clear film: it shows by its
+seals, its edges and the glints along its creases, and the creases keep off
+the head, so no glint crosses the face and no milky veil greys the photo.
 
 1. Take or pick a photo of yourself, the whole of you in frame, seen from a
    little above (sitting or lying works best: you will lie in the box).
